@@ -42,11 +42,11 @@ Event = Command Input + Execution Context
 
 **示例对比**：
 
-| 来源 | 字段 | 说明 |
-|------|------|------|
-| **Command Input** | `modifiedBy`, `inputVariables` | 用户提供的修改内容 |
-| **Execution Context** | `version`, `previousVersion` | 执行时确定的版本信息 |
-| **Execution Context** | `timestamp`, `eventId` | 系统生成的时间和ID |
+| 来源                        | 字段                               | 说明                 |
+| --------------------------- | ---------------------------------- | -------------------- |
+| **Command Input**     | `modifiedBy`, `inputVariables` | 用户提供的修改内容   |
+| **Execution Context** | `version`, `previousVersion`   | 执行时确定的版本信息 |
+| **Execution Context** | `timestamp`, `eventId`         | 系统生成的时间和ID   |
 
 ## 事件消息体通用结构
 
@@ -126,72 +126,6 @@ Event = Command Input + Execution Context
   - 完整的聚合根状态快照
   - 详细的变更内容（通过版本查询获取）
 
-## 使用场景
-
-### 1. 变更通知
-
-下游系统订阅事件以响应变化：
-
-- **缓存失效**：收到事件后使相关缓存失效
-- **触发 CI/CD**：任务定义发布后触发构建流程
-- **通知用户**：通过 WebSocket 推送变更通知
-
-### 2. 审计日志
-
-记录所有变更的时间、操作者和版本信息：
-
-- 谁（`modifiedBy`）在什么时间（`timestamp`）
-- 对什么资源（`aggregateId`）做了什么操作（`eventType`）
-- 产生了什么版本（`payload.version`）
-
-### 3. 事件溯源
-
-通过 `aggregateId` 和 `version` 查询聚合根的完整事件历史：
-
-- 按版本顺序查询所有事件
-- 了解资源的完整演变过程
-- 支持时间旅行调试
-
-### 4. 最终一致性
-
-异步传播变更到读模型或其他系统：
-
-- **搜索索引**：更新 Elasticsearch 等搜索引擎
-- **数据仓库**：同步数据到分析系统
-- **第三方系统**：通过 Webhook 通知外部系统
-
-### 5. 版本追溯
-
-通过事件中的版本号可以查询任何时刻的完整状态：
-
-- 从事件获取版本号
-- 通过 API 查询特定版本的完整内容
-- 对比不同版本生成变更报告
-
-## 查询完整数据
-
-事件订阅者如需获取完整的聚合根数据，应通过 API 查询：
-
-### TaskDefinition 查询示例
-
-```bash
-# 查询特定草稿版本
-GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115140000
-
-# 查询最新草稿（简写）
-GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft
-
-# 查询已发布版本
-GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
-```
-
-### 查询优点
-
-- **避免数据冗余**：事件中不重复存储完整结构
-- **完整可追溯**：任何版本的完整状态都可查询
-- **降低耦合度**：事件结构与聚合根模型独立演进
-- **简化事件处理**：订阅者只需处理轻量级通知
-
 ## 事件发布原则
 
 ### 发布时机
@@ -221,8 +155,8 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 **示例**：
 
 - `TaskDefinitionCreated` - 任务定义已创建
-- `TaskDefinitionModified` - 任务定义已修改
-- `TaskDefinitionPublished` - 任务定义已发布
+- `DraftVersionCreated` - 草稿版本已创建
+- `VersionPublished` - 版本已发布
 - `PipelineExecutionStarted` - 流水线执行已启动
 - `PipelineExecutionCompleted` - 流水线执行已完成
 - `PipelineExecutionFailed` - 流水线执行已失败
@@ -240,8 +174,8 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
   "namespace": "com.company.tasks",
   "name": "data_cleaner",
   "version": "draft-20250115140000",
-  "previousVersion": "draft-20250115130000",
-  "modifiedBy": "bob",
+  "basedOn": "draft-20250115130000",
+  "createdBy": "bob",
   "releaseNotes": "Fix bug in data validation"
 }
 ```
@@ -254,27 +188,27 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 
 1. **只增加字段，不删除字段**：保持向后兼容
 2. **新字段设为可选**：旧版本订阅者可以忽略
-3. **使用版本化事件类型**：如需重大变更，创建新的事件类型（如 `TaskDefinitionModifiedV2`）
+3. **使用版本化事件类型**：如需重大变更，创建新的事件类型（如 `DraftVersionCreatedV2`）
 
 **示例**：
 
 ```json
 // V1
 {
-  "eventType": "TaskDefinitionModified",
+  "eventType": "DraftVersionCreated",
   "payload": {
     "version": "draft-20250115140000",
-    "modifiedBy": "bob"
+    "createdBy": "bob"
   }
 }
 
 // V2 - 添加新字段
 {
-  "eventType": "TaskDefinitionModified",
+  "eventType": "DraftVersionCreated",
   "payload": {
     "version": "draft-20250115140000",
-    "previousVersion": "draft-20250115130000",  // ← 新增
-    "modifiedBy": "bob",
+    "basedOn": "draft-20250115130000",  // ← 新增
+    "createdBy": "bob",
     "reason": "Bug fix"  // ← 新增（可选）
   }
 }
@@ -288,26 +222,56 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 - **缺失字段**：为缺失的可选字段提供默认值
 - **类型检查**：验证字段类型，优雅处理类型错误
 
-## 事件文档要求
+## 测试指南
 
-在领域模型文档中定义事件时，应包含以下内容：
+### 事件发布测试
 
-### 必需内容
+```python
+def test_task_definition_modified_event():
+    # Given
+    task_def = create_task_definition("com.company.tasks:test_task")
+  
+    # When
+    modified_task = modify_task_definition(
+        task_def.aggregate_id,
+        changes={"inputVariables": [...]}
+    )
+  
+    # Then - 验证事件已发布
+    events = event_bus.get_published_events()
+    assert len(events) == 1
+  
+    event = events[0]
+    assert event.eventType == "TaskDefinitionModified"
+    assert event.aggregateId == "com.company.tasks:test_task"
+    assert event.payload["version"] == modified_task.version
+    assert event.payload["modifiedBy"] == "test_user"
+```
 
-1. **事件名称**：遵循命名规范的事件类型名称
-2. **事件说明**：简要描述事件表示什么业务事实
-3. **消息体结构**：完整的 JSON 示例
-4. **Payload 字段说明**：每个字段的含义和用途
+### 事件消费测试
 
-### 可选内容
-
-- **触发条件**：什么操作会产生此事件
-- **业务规则**：事件发布的前置条件
-- **相关事件**：与此事件相关的其他事件
-
-### 示例
-
-参考 [TaskDefinition 领域模型](../领域模型定义/TaskDefinition.md) 中的事件定义部分。
+```python
+def test_event_handler():
+    # Given
+    event = TaskDefinitionModified(
+        eventId="test-uuid",
+        aggregateId="com.company.tasks:test_task",
+        version=2,
+        timestamp="2025-01-15T14:00:00Z",
+        payload={
+            "version": "draft-20250115140000",
+            "previousVersion": "draft-20250115130000",
+            "modifiedBy": "bob"
+        }
+    )
+  
+    # When
+    handle_event(event)
+  
+    # Then - 验证副作用
+    assert cache.is_invalidated("com.company.tasks:test_task")
+    assert ci_cd.is_triggered("com.company.tasks:test_task")
+```
 
 ## 参考文档
 

@@ -63,6 +63,7 @@ TaskDefinition:
 TaskDefinition 支持多版本管理：
 
 **草稿版本（Draft Versions）**：
+
 - 格式：`draft-YYYYMMDDHHmmss`（如 `draft-20250115140000`）
 - 状态：`DRAFT`
 - 特点：
@@ -244,7 +245,6 @@ pipeline:
       startWhen: "event:quality_check.completed || event:manual_review.approved"
 ```
 
-
 ## 不变式
 
 - **复合键全局唯一**：`namespace:name:version` 三元组在系统中全局唯一。
@@ -255,40 +255,9 @@ pipeline:
 
 ## 领域事件
 
-### 事件设计原则
-
-领域事件遵循**轻量化设计**原则：
-
-- **最小必要信息**：只包含标识变化的关键信息
-- **引用标识符**：包含 `namespace`、`name`、`version` 让订阅者能查询完整数据
-- **避免数据冗余**：不在事件中复制完整的任务定义结构
-- **可追溯性**：通过版本号可以查询到任何时刻的完整状态
-- 订阅者需要完整数据时，通过 `GET /api/v1/task-definitions/{namespace:name:version}` 查询
-
-### Command vs Event
-
-**Command（命令）** 表达"修改意图"：
-
-- 用户通过 API 发送的请求体
-- 包含要修改的字段和值
-- 在执行前发送
-
-**Event（事件）** 记录"已发生的事实"：
-
-- Command 执行后生成
-- 包含执行上下文（如新版本号、时间戳、事件ID）
-- 不包含完整状态快照（通过版本号查询）
-
-**关系**：`Event = Command Input + Execution Context`
-
-```text
-用户发送 Command    →    系统执行    →    生成 Event
-   (意图)                (处理)           (事实记录)
-```
-
 ### TaskDefinitionCreated
 
-任务定义已创建（初始草稿版本）。
+任务定义已创建（聚合根创建，自动创建初始草稿版本）。
 
 **消息体结构**：
 
@@ -302,7 +271,7 @@ pipeline:
   "payload": {
     "namespace": "com.company.tasks",
     "name": "data_cleaner",
-    "version": "draft-20250115100000",
+    "initialVersion": "draft-20250115100000",
     "type": "ray_operator",
     "createdBy": "alice"
   }
@@ -312,20 +281,20 @@ pipeline:
 **Payload 字段说明**：
 
 - `namespace`, `name`: 任务定义标识符
-- `version`: 新创建的草稿版本号（`draft-{timestamp}` 格式）
+- `initialVersion`: 自动创建的初始草稿版本号
 - `type`: 任务类型
 - `createdBy`: 创建者
 
-### TaskDefinitionModified
+### DraftVersionCreated
 
-任务定义已修改（创建新的草稿版本）。
+草稿版本已创建（创建新的草稿版本）。
 
 **消息体结构**：
 
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440001",
-  "eventType": "TaskDefinitionModified",
+  "eventType": "DraftVersionCreated",
   "timestamp": "2025-01-15T14:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 2,
@@ -333,8 +302,8 @@ pipeline:
     "namespace": "com.company.tasks",
     "name": "data_cleaner",
     "version": "draft-20250115140000",
-    "previousVersion": "draft-20250115130000",
-    "modifiedBy": "bob"
+    "basedOn": "draft-20250115130000",
+    "createdBy": "bob"
   }
 }
 ```
@@ -342,8 +311,8 @@ pipeline:
 **Payload 字段说明**：
 
 - `version`: 新创建的草稿版本号
-- `previousVersion`: 修改前的版本号
-- `modifiedBy`: 修改者
+- `basedOn`: 基于哪个版本创建（可以是草稿或已发布版本）
+- `createdBy`: 创建者
 
 **查询完整内容**：
 
@@ -351,20 +320,20 @@ pipeline:
 # 查询新版本的完整定义
 GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115140000
 
-# 查询前一个版本进行对比
+# 查询基础版本进行对比
 GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115130000
 ```
 
-### TaskDefinitionPublished
+### VersionPublished
 
-任务定义已发布（从草稿版本创建已发布版本）。
+版本已发布（从草稿版本发布为正式版本）。
 
 **消息体结构**：
 
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440002",
-  "eventType": "TaskDefinitionPublished",
+  "eventType": "VersionPublished",
   "timestamp": "2025-01-15T15:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 3,
@@ -387,40 +356,6 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115130000
 - `releaseNotes`: 发布说明
 
 ---
-
-### 事件消息体通用结构
-
-所有领域事件都遵循统一的消息结构：
-
-```json
-{
-  "eventId": "uuid",           // 事件唯一标识符
-  "eventType": "string",       // 事件类型名称
-  "timestamp": "ISO8601",      // 事件发生时间
-  "aggregateId": "string",     // 聚合根标识符 (namespace:name)
-  "version": "integer",        // 事件序列号（单调递增）
-  "payload": {                 // 事件负载（轻量化设计）
-    // 最小必要信息
-  }
-}
-```
-
-**字段说明**：
-
-- `eventId`: 事件的全局唯一标识符（UUID 格式）
-- `eventType`: 事件类型，用于路由和处理
-- `timestamp`: 事件发生的时间戳（ISO 8601 格式）
-- `aggregateId`: 聚合根标识符（格式：`namespace:name`，不包含版本号）
-- `version`: 该聚合根的事件序列号（从 1 开始递增，用于事件溯源和顺序保证）
-- `payload`: 轻量化的事件负载，只包含关键标识和变更摘要
-
-### 使用场景
-
-1. **变更通知**：下游系统订阅事件以响应变化（如缓存失效、触发 CI/CD）
-2. **审计日志**：记录所有变更的时间、操作者和版本信息
-3. **事件溯源**：通过 `aggregateId` 和 `version` 查询聚合根的完整事件历史
-4. **最终一致性**：异步传播变更到读模型或其他系统
-5. **版本追溯**：通过事件中的版本号可以查询任何时刻的完整状态
 
 ### 查询完整数据
 
@@ -448,6 +383,8 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 
 ### CreateTaskDefinition
 
+创建任务定义（聚合根），系统自动创建初始草稿版本。
+
 **请求**：
 
 ```http
@@ -464,18 +401,13 @@ Content-Type: application/json
 }
 ```
 
-**说明**：
-
-创建一个新的任务定义。系统会自动创建初始草稿版本（`draft-{timestamp}` 格式），此版本处于草稿状态，允许修改但不允许被流水线引用。
-
 **返回**：
 
 ```json
 {
   "namespace": "com.company.tasks",
   "name": "data_cleaner",
-  "version": "draft-20250115100000",
-  "status": "DRAFT",
+  "initialVersion": "draft-20250115100000",
   "type": "ray_operator",
   "metadata": {
     "description": "数据清洗任务"
@@ -488,21 +420,26 @@ Content-Type: application/json
 **业务规则**：
 
 - `namespace:name` 的组合必须全局唯一（如果已存在，返回 409 Conflict）
-- 系统自动生成版本号：`draft-{YYYYMMDDHHmmss}`
+- 系统自动创建初始草稿版本：`draft-{YYYYMMDDHHmmss}`
 - 任务类型决定了执行定义需要哪些配置
-- 初始化时输入变量、输出变量、执行定义都为空，需要通过 `ModifyTaskDefinition` 填充
+- 初始版本为空模板，需要通过 `CreateDraftVersion` 填充内容
+
+**触发事件**：`TaskDefinitionCreated`
 
 ---
 
-### ModifyTaskDefinition
+### CreateDraftVersion
+
+创建新的草稿版本。
 
 **请求**：
 
 ```http
-PATCH /api/v1/task-definitions/{namespace:name}/draft
+POST /api/v1/task-definitions/{namespace:name}/drafts
 Content-Type: application/json
 
 {
+  "basedOn": "draft-20250115100000",
   "inputVariables": [...],
   "outputVariables": [...],
   "executionDefinition": {...},
@@ -515,12 +452,11 @@ Content-Type: application/json
 
 **说明**：
 
-修改任务定义，创建新的草稿版本。系统会：
+创建新的草稿版本。可以基于：
 
-1. 读取最新的草稿版本
-2. 应用修改
-3. 创建新的 `draft-{timestamp}` 版本
-4. 保留历史草稿版本（用于追溯）
+- 最新的草稿版本（默认）
+- 指定的草稿版本
+- 已发布版本
 
 **返回**：
 
@@ -529,7 +465,7 @@ Content-Type: application/json
   "namespace": "com.company.tasks",
   "name": "data_cleaner",
   "version": "draft-20250115140000",
-  "previousVersion": "draft-20250115130000",
+  "basedOn": "draft-20250115100000",
   "status": "DRAFT",
   "type": "ray_operator",
   "inputVariables": [...],
@@ -546,37 +482,35 @@ Content-Type: application/json
 
 **业务规则**：
 
-- 只能修改草稿版本，已发布版本不可修改
-- 每次修改创建新版本（追加式，不覆盖）
-- 可以增加、删除或修改 inputVariables 和 outputVariables
-- 可以修改 type，但需要同步更新 executionDefinition
-- 系统自动生成新版本号和时间戳
+- `basedOn` 可选，默认为最新草稿版本
+- `basedOn` 可以是草稿版本或已发布版本
+- 系统自动生成新版本号：`draft-{YYYYMMDDHHmmss}`
+- 保留所有历史草稿版本（追加式，不覆盖）
+- 可以修改任何字段（type, inputVariables, outputVariables 等）
+
+**触发事件**：`DraftVersionCreated`
 
 ---
 
-### PublishTaskDefinition
+### PublishVersion
+
+发布草稿版本为正式版本。
 
 **请求**：
 
 ```http
-POST /api/v1/task-definitions/{namespace:name}/publish
+POST /api/v1/task-definitions/{namespace:name}/drafts/{draft-version}/publish
 Content-Type: application/json
 
 {
-  "fromVersion": "draft-20250115140000",
-  "toVersion": "1.0.0",
+  "version": "1.0.0",
   "releaseNotes": "Initial release with data cleaning operators"
 }
 ```
 
 **说明**：
 
-将指定的草稿版本发布为正式版本。发布后该版本变为不可变，可以被 Pipeline 引用。系统会：
-
-1. 读取指定的草稿版本
-2. 创建新的已发布版本（语义化版本号）
-3. 设置 status = "PUBLISHED"，记录 publishedAt 和 publishedBy
-4. 保留原草稿版本（不删除）
+将指定的草稿版本发布为正式版本。发布后该版本变为不可变，可以被 Pipeline 引用。
 
 **返回**：
 
@@ -595,8 +529,7 @@ Content-Type: application/json
     "description": "数据清洗任务"
   },
   "releaseNotes": "Initial release with data cleaning operators",
-  "createdAt": "2025-01-15T10:00:00Z",
-  "createdBy": "alice",
+  "publishedFrom": "draft-20250115140000",
   "publishedAt": "2025-01-15T15:00:00Z",
   "publishedBy": "alice"
 }
@@ -604,11 +537,13 @@ Content-Type: application/json
 
 **业务规则**：
 
-- `fromVersion` 必须存在且状态为 DRAFT
-- `toVersion` 必须遵循语义化版本规范（major.minor.patch）
-- `toVersion` 必须大于该任务的所有已发布版本（递增原则）
+- 草稿版本必须存在且状态为 DRAFT
+- `version` 必须遵循语义化版本规范（major.minor.patch）
+- `version` 必须大于该任务的所有已发布版本（递增原则）
 - 发布后已发布版本不可修改（immutable）
 - 原草稿版本保留，可用于历史追溯
+
+**触发事件**：`VersionPublished`
 
 ## 任务查询
 

@@ -24,7 +24,7 @@ PipelineExecution:
   version: string                      # 引用的版本号（如 "1.0.0"）
   
   # 执行状态
-  status: enum                         # "pending" | "running" | "completed" | "failed" | "cancelled"
+  status: enum                         # "running" | "completed" | "failed" | "cancelled"
   
   # 输入变量实例
   inputVariables: Map[string, any]     # Pipeline 输入参数的实际值
@@ -86,8 +86,7 @@ PipelineExecution:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending
-    pending --> running
+    [*] --> running
     running --> completed
     running --> failed
     running --> cancelled
@@ -98,27 +97,29 @@ stateDiagram-v2
 
 **流水线状态转换说明**：
 
-- `pending → running`：开始执行，发布 pipeline.started 事件
+- `[*] → running`：启动执行（创建+启动），发布 pipeline.started 事件
 - `running → completed`：所有节点成功
 - `running → failed`：任一节点失败
 - `running → cancelled`：用户取消
 
 **节点执行状态**：
 
-- `pending`：等待触发
+- `pending`：等待触发（仅用于内部节点，由 Pipeline 创建）
 - `running`：正在执行
 - `completed`：执行成功
 - `failed`：执行失败
 - `skipped`：被跳过
 - `cancelled`：被取消
 
+**说明**：pending 状态仅用于 Pipeline 内部的节点，由 PipelineExecution 创建时初始化。用户直接启动的 Task 或 Pipeline 不经过 pending 状态。
+
 ## 执行流程
 
-### 1. 创建执行实例
+### 1. 启动执行（创建+启动，一步到位）
 
 ```yaml
 # 用户请求
-POST /api/v1/pipelines/{pipelineId}/executions
+POST /api/v1/pipelines/{pipelineId}/start
 {
   "version": "1.0.0",
   "inputVariables": {
@@ -130,23 +131,16 @@ POST /api/v1/pipelines/{pipelineId}/executions
 # 系统行为
 1. 验证 PipelineDefinition 存在且已发布
 2. 验证 inputVariables 满足定义要求
-3. 创建 PipelineExecution 实例，status = "pending"
+3. 创建 PipelineExecution 实例，status = "running"
 4. 初始化所有 NodeExecution，status = "pending"
 5. 为每个节点注册事件订阅（根据 startWhen 等表达式）
-6. 返回 executionId
+6. 发布 "pipeline.started" 事件
+7. 事件总线通知所有订阅者
+8. 订阅了 "pipeline.started" 的节点开始执行
+9. 返回 executionId
 ```
 
-### 2. 启动执行
-
-```yaml
-# 触发执行开始
-1. PipelineExecution.status 变更为 "running"
-2. 发布 "pipeline.started" 事件
-3. 事件总线通知所有订阅者
-4. 订阅了 "pipeline.started" 的节点开始执行
-```
-
-### 3. 节点执行循环
+### 2. 节点执行循环
 
 ```yaml
 # 当节点的 startWhen 表达式满足时
@@ -183,7 +177,7 @@ POST /api/v1/pipelines/{pipelineId}/executions
 5. NodeExecution.completedAt = 当前时间
 ```
 
-### 4. 流水线完成判断
+### 3. 流水线完成判断
 
 ```yaml
 # 持续检查流水线状态
@@ -383,10 +377,10 @@ TaskDefinition                      │              └─ references ─► Pi
 
 ## API 示例
 
-### 创建执行
+### 启动执行
 
 ```http
-POST /api/v1/pipelines/{pipelineId}/executions
+POST /api/v1/pipelines/{pipelineId}/start
 Content-Type: application/json
 
 {
@@ -399,27 +393,15 @@ Content-Type: application/json
   "tags": ["daily-batch", "production"]
 }
 
-# 响应
+# 响应（创建并启动，一步到位）
 {
   "executionId": "exec_20250115_001",
   "pipelineId": "com.company.pipelines:data_etl",
   "version": "1.0.0",
-  "status": "pending",
-  "createdAt": "2025-01-15T10:00:00Z",
-  "createdBy": "alice@company.com"
-}
-```
-
-### 启动执行
-
-```http
-POST /api/v1/executions/{executionId}/start
-
-# 响应
-{
-  "executionId": "exec_20250115_001",
   "status": "running",
-  "startedAt": "2025-01-15T10:00:05Z"
+  "createdAt": "2025-01-15T10:00:00Z",
+  "startedAt": "2025-01-15T10:00:00Z",
+  "createdBy": "alice@company.com"
 }
 ```
 

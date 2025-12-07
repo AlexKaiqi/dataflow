@@ -24,10 +24,10 @@ TaskExecution:
   taskVersion: string                  # 任务版本号
   
   # 执行状态
-  status: enum                         # "pending" | "running" | "completed" | "failed" | "stopped"
+  status: enum                         # "running" | "completed" | "failed" | "stopped"
   
   # 输入输出
-  resolvedInputs: Map[string, any]     # 实际解析的输入变量值
+  inputs: Map[string, any]             # 实际解析的输入变量值
   outputs: Map[string, any]?           # 任务输出变量
     # - completed 状态：包含任务定义的输出变量
     # - failed 状态：包含错误相关的输出变量（如 error_type, error_message, error_code）
@@ -48,8 +48,7 @@ TaskExecution:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending
-    pending --> running
+    [*] --> running
     running --> completed
     running --> failed
     running --> stopped
@@ -62,7 +61,7 @@ stateDiagram-v2
 
 **状态转换说明**：
 
-- `pending → running`：开始执行，发布 started 事件
+- `[*] → running`：启动任务（创建+执行），发布 started 事件
 - `running → completed`：执行成功，发布 completed 事件
 - `running → failed`：执行失败，发布 failed 事件
 - `running → stopped`：手动停止（仅流处理），发布 stopped 事件
@@ -73,7 +72,6 @@ stateDiagram-v2
 
 | 状态 | 说明 | 允许的操作 |
 |------|------|-----------|
-| `pending` | 任务已创建，等待执行 | start |
 | `running` | 任务正在执行 | stop（仅流处理） |
 | `completed` | 任务执行成功 | 无（最终状态） |
 | `failed` | 任务执行失败 | retry |
@@ -84,22 +82,19 @@ stateDiagram-v2
 ### 批处理任务执行流程
 
 ```yaml
-1. 创建执行实例
+1. 启动任务（创建+执行，一步到位）
    - 验证 TaskDefinition 存在且已发布
-   - 验证 resolvedInputs 满足 inputVariables 定义
-   - 创建 TaskExecution，status = "pending"
-   - 返回 executionId
-
-2. 启动任务
-   - status: pending → running
+   - 验证 inputs 满足 inputVariables 定义
+   - 创建 TaskExecution，status = "running"
    - 发布 "{task_namespace}.{task_name}.started" 事件
    - 提交任务到执行引擎
+   - 返回 executionId
 
-3. 执行中
+2. 执行中
    - 执行引擎运行任务逻辑
    - 可选：发布进度事件
 
-4. 执行完成
+3. 执行完成
    成功情况:
      - status: running → completed
      - 从执行器获取输出结果
@@ -119,16 +114,16 @@ stateDiagram-v2
 ### 流处理任务执行流程
 
 ```yaml
-1. 创建执行实例
-   - 同批处理任务
-
-2. 启动任务
-   - status: pending → running
+1. 启动任务（创建+执行，一步到位）
+   - 验证 TaskDefinition 存在且已发布
+   - 验证 inputs 满足 inputVariables 定义
+   - 创建 TaskExecution，status = "running"
    - 发布 "{task_namespace}.{task_name}.started" 事件
    - 启动流处理作业（如 Flink Job）
    - 流处理作业持续运行
+   - 返回 executionId
 
-3. 运行中管理
+2. 运行中管理
    停止操作:
      - 接收停止指令
      - 优雅关闭流处理作业
@@ -150,16 +145,16 @@ stateDiagram-v2
 ### 审批任务执行流程
 
 ```yaml
-1. 创建执行实例
-   - 同批处理任务
-
-2. 启动审批流程
-   - status: pending → running
+1. 启动审批流程（创建+执行，一步到位）
+   - 验证 TaskDefinition 存在且已发布
+   - 验证 inputs 满足 inputVariables 定义
+   - 创建 TaskExecution，status = "running"
    - 发布 "{task_namespace}.{task_name}.started" 事件
    - 发送审批请求到外部系统或内部审批服务
    - 生成 executionToken 供回调使用
+   - 返回 executionId
 
-3. 等待审批
+2. 等待审批
    - 任务进入等待状态
    - 定期检查超时条件
    
@@ -307,43 +302,31 @@ outputs 保存条件:
 
 ## API 示例
 
-### 创建独立任务执行
+### 启动任务执行
 
 ```http
-POST /api/v1/tasks/{namespace}:{name}/executions
+POST /api/v1/tasks/{namespace}:{name}/start
 Content-Type: application/json
 
 {
   "version": "1.0.0",
-  "resolvedInputs": {
+  "inputs": {
     "data_path": "s3://bucket/data/input.parquet",
     "quality_threshold": 0.9
   },
   "tags": ["test", "manual-run"]
 }
 
-# 响应
+# 响应（创建并启动，一步到位）
 {
   "executionId": "task_exec_001",
   "taskNamespace": "com.company.tasks",
   "taskName": "data_quality_check",
   "taskVersion": "1.0.0",
-  "status": "pending",
-  "createdAt": "2025-01-15T10:00:00Z",
-  "createdBy": "alice@company.com"
-}
-```
-
-### 启动任务执行
-
-```http
-POST /api/v1/task-executions/{executionId}/start
-
-# 响应
-{
-  "executionId": "task_exec_001",
   "status": "running",
-  "startedAt": "2025-01-15T10:00:05Z"
+  "createdAt": "2025-01-15T10:00:00Z",
+  "startedAt": "2025-01-15T10:00:00Z",
+  "createdBy": "alice@company.com"
 }
 ```
 
@@ -359,7 +342,7 @@ GET /api/v1/task-executions/{executionId}
   "taskName": "data_quality_check",
   "taskVersion": "1.0.0",
   "status": "completed",
-  "resolvedInputs": {
+  "inputs": {
     "data_path": "s3://bucket/data/input.parquet",
     "quality_threshold": 0.9
   },

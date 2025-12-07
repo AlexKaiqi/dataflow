@@ -154,9 +154,12 @@ Event = Command Input + Execution Context
 
 **示例**：
 
-- `TaskDefinitionCreated` - 任务定义已创建
-- `DraftVersionCreated` - 草稿版本已创建
-- `VersionPublished` - 版本已发布
+- `TaskCreated` - 任务已创建
+- `TaskDraftVersionCreated` - 任务草稿版本已创建
+- `TaskVersionPublished` - 任务版本已发布
+- `PipelineCreated` - 流水线已创建
+- `PipelineDraftVersionCreated` - 流水线草稿版本已创建
+- `PipelineVersionPublished` - 流水线版本已发布
 - `PipelineExecutionStarted` - 流水线执行已启动
 - `PipelineExecutionCompleted` - 流水线执行已完成
 - `PipelineExecutionFailed` - 流水线执行已失败
@@ -195,7 +198,7 @@ Event = Command Input + Execution Context
 ```json
 // V1
 {
-  "eventType": "DraftVersionCreated",
+  "eventType": "TaskDraftVersionCreated",
   "payload": {
     "version": "draft-20250115140000",
     "createdBy": "bob"
@@ -221,57 +224,6 @@ Event = Command Input + Execution Context
 - **未知字段**：忽略不认识的字段
 - **缺失字段**：为缺失的可选字段提供默认值
 - **类型检查**：验证字段类型，优雅处理类型错误
-
-## 测试指南
-
-### 事件发布测试
-
-```python
-def test_task_definition_modified_event():
-    # Given
-    task_def = create_task_definition("com.company.tasks:test_task")
-  
-    # When
-    modified_task = modify_task_definition(
-        task_def.aggregate_id,
-        changes={"inputVariables": [...]}
-    )
-  
-    # Then - 验证事件已发布
-    events = event_bus.get_published_events()
-    assert len(events) == 1
-  
-    event = events[0]
-    assert event.eventType == "TaskDefinitionModified"
-    assert event.aggregateId == "com.company.tasks:test_task"
-    assert event.payload["version"] == modified_task.version
-    assert event.payload["modifiedBy"] == "test_user"
-```
-
-### 事件消费测试
-
-```python
-def test_event_handler():
-    # Given
-    event = TaskDefinitionModified(
-        eventId="test-uuid",
-        aggregateId="com.company.tasks:test_task",
-        version=2,
-        timestamp="2025-01-15T14:00:00Z",
-        payload={
-            "version": "draft-20250115140000",
-            "previousVersion": "draft-20250115130000",
-            "modifiedBy": "bob"
-        }
-    )
-  
-    # When
-    handle_event(event)
-  
-    # Then - 验证副作用
-    assert cache.is_invalidated("com.company.tasks:test_task")
-    assert ci_cd.is_triggered("com.company.tasks:test_task")
-```
 
 ## 参考文档
 

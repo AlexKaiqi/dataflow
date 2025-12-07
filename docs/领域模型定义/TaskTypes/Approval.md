@@ -425,4 +425,4 @@ Approval 任务类型的核心价值：
 
 - [Event.md](../Event.md) - 了解审批事件的发布和订阅
 - [Expression.md](../Expression.md) - 了解如何使用审批结果
-- [Node.md](../Node.md) - 了解如何配置审批节点
+- [PipelineDefinition.md](../PipelineDefinition.md) - 了解如何配置审批节点

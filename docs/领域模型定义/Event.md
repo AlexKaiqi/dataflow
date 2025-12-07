@@ -232,9 +232,10 @@ stopWhen: "event:monitor.statusChanged && {{ monitor.health == 'critical' }}"
 
 - `started`, `succeeded`, `failed`, `skipped`, `completed`
 
-**监听的事件**：
+**控制的行为**：
 
-- `startWhen`: 何时启动
+- `startWhen`: 何时启动执行
+- `retryWhen`: 何时重试执行
 
 **示例**：
 
@@ -251,10 +252,10 @@ stopWhen: "event:monitor.statusChanged && {{ monitor.health == 'critical' }}"
 
 - `started`, `stopped`, `statusChanged`
 
-**监听的事件**：
+**控制的行为**：
 
-- `startWhen`: 何时启动
-- `stopWhen`: 何时停止
+- `startWhen`: 何时启动执行
+- `stopWhen`: 何时停止执行
 
 **示例**：
 
@@ -390,7 +391,7 @@ def cleanup_subscriptions(self, node, phase):
 | 文档 | 关系 |
 |------|------|
 | **Expression.md** | 定义事件表达式的语法规范 |
-| **Node.md** | 定义节点如何使用事件表达式（startWhen, stopWhen） |
+| **PipelineDefinition.md** | 定义节点如何使用事件表达式（startWhen, stopWhen） |
 | **TaskExecution.md** | 定义任务执行发布的生命周期事件 |
 | **PipelineExecution.md** | 定义流程执行发布的生命周期事件 |
 | **TaskDefinition.md** | 定义外部事件的声明方式 |

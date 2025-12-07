@@ -36,13 +36,13 @@ Definition 和 Execution 是同一聚合根的两个状态：
 
 ```text
 领域模型定义/
-├── Pipeline.md          # 包含 Definition 和 Execution
-├── Task.md              # 包含 Definition 和 Execution
-├── Node.md
+├── PipelineDefinition.md  # 包含 Pipeline 和 Node 的定义
+├── TaskDefinition.md
 ├── Expression.md
 ├── Event.md
-├── Variable.md
-└── TaskTypes/           # 唯一的子目录
+├── VariableDefinition.md
+├── VariableReference.md
+└── TaskTypes/             # 唯一的子目录
     ├── Approval.md
     ├── SQL.md
     └── ...

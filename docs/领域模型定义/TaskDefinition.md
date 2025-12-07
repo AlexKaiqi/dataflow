@@ -8,7 +8,7 @@ TaskDefinition 是可复用的任务模板，定义了一类任务"能做什么"
 
 - **定义任务行为**：描述任务类型及其特有的行为能力（如批处理的 start/retry，流处理的 start/stop/restart）
 - **声明接口契约**：定义输入变量和输出变量，明确任务与外部的数据交互
-- **定义事件规约**：说明任务在不同状态下产生的事件（如 started、completed、failed）
+- **定义事件规约**：说明任务产生的事件（如 started、completed、failed）
 - **支持版本管理**：允许同一任务有多个版本，支持灰度发布和回滚
 - **支持跨流水线复用**：一个 TaskDefinition 可以被多个流水线引用
 
@@ -264,7 +264,7 @@ pipeline:
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440000",
-  "eventType": "TaskDefinitionCreated",
+  "eventType": "TaskCreated",
   "timestamp": "2025-01-15T10:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 1,
@@ -285,7 +285,7 @@ pipeline:
 - `type`: 任务类型
 - `createdBy`: 创建者
 
-### DraftVersionCreated
+### TaskVersionCreated
 
 草稿版本已创建（创建新的草稿版本）。
 
@@ -294,7 +294,7 @@ pipeline:
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440001",
-  "eventType": "DraftVersionCreated",
+  "eventType": "TaskDraftVersionCreated",
   "timestamp": "2025-01-15T14:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 2,
@@ -324,7 +324,7 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115140000
 GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115130000
 ```
 
-### VersionPublished
+### TaskVersionPublished
 
 版本已发布（从草稿版本发布为正式版本）。
 
@@ -333,7 +333,7 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115130000
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440002",
-  "eventType": "VersionPublished",
+  "eventType": "TaskVersionPublished",
   "timestamp": "2025-01-15T15:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 3,
@@ -381,7 +381,7 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 
 ## 命令
 
-### CreateTaskDefinition
+### CreateDefinition
 
 创建任务定义（聚合根），系统自动创建初始草稿版本。
 
@@ -424,11 +424,11 @@ Content-Type: application/json
 - 任务类型决定了执行定义需要哪些配置
 - 初始版本为空模板，需要通过 `CreateDraftVersion` 填充内容
 
-**触发事件**：`TaskDefinitionCreated`
+**触发事件**：`TaskCreated`
 
 ---
 
-### CreateDraftVersion
+### CreateVersion
 
 创建新的草稿版本。
 
@@ -488,7 +488,7 @@ Content-Type: application/json
 - 保留所有历史草稿版本（追加式，不覆盖）
 - 可以修改任何字段（type, inputVariables, outputVariables 等）
 
-**触发事件**：`DraftVersionCreated`
+**触发事件**：`TaskDraftVersionCreated`
 
 ---
 
@@ -543,7 +543,7 @@ Content-Type: application/json
 - 发布后已发布版本不可修改（immutable）
 - 原草稿版本保留，可用于历史追溯
 
-**触发事件**：`VersionPublished`
+**触发事件**：`TaskVersionPublished`
 
 ## 任务查询
 

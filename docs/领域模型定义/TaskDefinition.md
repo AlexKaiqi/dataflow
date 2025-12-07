@@ -133,12 +133,6 @@ versions:
 - **事件**：started, approved, rejected, timeout
 - **输出变量示例**：approver, approval_time, comments
 
-#### Wait 等待任务
-
-- **行为**：start
-- **事件**：started, timeout, completed
-- **输出变量示例**：wait_duration
-
 详细说明请参考 [TaskTypes 目录](./TaskTypes/) 下的各任务类型文档。
 
 ## 核心概念详解
@@ -673,3 +667,18 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?status=PUBL
 - 可通过 `status` 参数过滤
 
 ---
+
+## 参考
+
+- [TaskExecution（任务执行）](./TaskExecution.md) - 任务的运行时实例
+- [PipelineDefinition（流水线定义）](./PipelineDefinition.md) - 流水线如何引用任务
+- [Event（事件）](./Event.md) - 任务产生的事件
+- [Variable（变量）](./Variable.md) - 任务的输入输出变量
+
+## Task Execution（运行态）
+
+### 概述
+
+**TaskExecution（任务执行）** 是 TaskDefinition 的运行时实例，记录单个任务的执行过程、状态和结果。每次执行任务都会创建一个新的 TaskExecution 聚合根。
+
+### 执行职责

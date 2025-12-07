@@ -2,7 +2,7 @@
 
 ## 概述
 
-**《TaskDefinition 任务定义》**是可复用的任务模板，定义了一类任务"能做什么"、"需要什么输入"、"产生什么输出"。它是独立于 **《Pipeline 流水线》**的领域概念，可以被多个 **《Pipeline 流水线》**的多个 **《Node 节点》**引用。
+TaskDefinition 是可复用的任务模板，定义了一类任务"能做什么"、"需要什么输入"、"产生什么输出"。它是独立存在的领域概念，可以被多个流水线的多个节点引用。
 
 ### 核心职责
 
@@ -10,20 +10,20 @@
 - **声明接口契约**：定义输入变量和输出变量，明确任务与外部的数据交互
 - **定义事件规约**：说明任务在不同状态下产生的事件（如 started、completed、failed）
 - **支持版本管理**：允许同一任务有多个版本，支持灰度发布和回滚
-- **支持跨 Pipeline 复用**：一个 TaskDefinition 可以被多个 Pipeline 引用
+- **支持跨流水线复用**：一个 TaskDefinition 可以被多个流水线引用
 
 ### 设计原则
 
-**《TaskDefinition 任务定义》只关心"是什么"，不关心"何时执行"**：
+**TaskDefinition 只关心"是什么"，不关心"何时执行"**：
 
 - ✅ 定义：任务类型、输入输出、执行逻辑
-- ✅ 定义：任务支持哪些 **《Action 行为》**
-- ✅ 定义：任务产生哪些 **《Event 事件》**
+- ✅ 定义：任务支持哪些行为（actions）
+- ✅ 定义：任务产生哪些事件（events）
 - ❌ 不定义：何时启动（startWhen）
 - ❌ 不定义：何时重试（retryWhen）
 - ❌ 不定义：依赖关系
 
-**编排逻辑由 《Node 节点》控制**：具体的执行时机、依赖关系、重试策略等编排逻辑在 **《Pipeline 流水线》**的 **《Node 节点》**中通过 **《Expression 表达式》**（startWhen、stopWhen 等）定义。
+**编排逻辑由节点控制**：具体的执行时机、依赖关系、重试策略等编排逻辑在流水线的节点中通过表达式（startWhen、stopWhen 等）定义。
 
 ## 领域模型结构
 
@@ -56,9 +56,9 @@ TaskDefinition:
   status: "DRAFT" | "PUBLISHED"
 ```
 
-## 任务类型（TaskType）
+## **《TaskType 任务类型》**
 
-不同的任务类型定义了不同的**行为能力**、**事件集合**和**变量特征**：
+不同的任务类型定义了不同的行为能力、事件集合和变量特征：
 
 ### 批处理任务
 
@@ -90,13 +90,13 @@ TaskDefinition:
 
 ### 控制流任务
 
-#### Approval 任务
+#### Approval 审批任务
 
 - **行为**：start（启动审批流程）
 - **事件**：started, approved, rejected, timeout
 - **输出变量示例**：approver, approval_time, comments
 
-#### Wait 任务
+#### Wait 等待任务
 
 - **行为**：start
 - **事件**：started, timeout, completed
@@ -106,36 +106,36 @@ TaskDefinition:
 
 ## 核心概念详解
 
-### 输入/输出变量
+### **《InputVariable 输入变量》** / **《OutputVariable 输出变量》**
 
 TaskDefinition 通过 `inputVariables` 和 `outputVariables` 定义任务与外部的数据接口契约。
 
-#### 输入变量（inputVariables）
+#### 输入变量
 
 定义任务执行需要的输入参数：
 
 ```yaml
 inputVariables:
-  - name: data_path
-    type: string
-    required: true
+  - name: data_path                    # 变量名
+    type: string                       # 数据类型
+    required: true                     # 是否必填
     description: "输入数据路径"
   
   - name: quality_threshold
     type: number
     required: false
-    default: 0.9
+    default: 0.9                       # 默认值
     description: "数据质量阈值"
 ```
 
-#### 输出变量（outputVariables）
+#### 输出变量
 
 定义任务执行后产生的输出变量：
 
 ```yaml
 outputVariables:
   - name: rows_processed
-    type: integer
+    type: integer                      # 数据类型
     description: "处理的数据行数"
   
   - name: quality_score
@@ -149,15 +149,13 @@ outputVariables:
 
 **重要说明**：
 
-- 输入变量在 Node 中通过表达式绑定具体值
-- 输出变量在任务执行完成后自动写入上下文，供下游 Node 使用
-- 输出变量可以在其他 Node 的 `startWhen`、`stopWhen` 等表达式中引用
+- 输入变量在节点中通过表达式绑定具体值
+- 输出变量在任务执行完成后自动写入执行上下文，供下游节点使用
+- 输出变量可以在其他节点的 `startWhen`、`stopWhen` 等表达式中引用
 
-### 行为与事件
+## **《Action 行为》**
 
-#### 行为（Actions）
-
-行为是任务可以被触发执行的操作，不同任务类型支持不同的行为：
+行为（Action）是任务可以被触发执行的操作。不同任务类型支持不同的行为。
 
 **所有任务通用**：
 
@@ -169,9 +167,9 @@ outputVariables:
 - `stop`: 停止运行中的任务（流处理任务）
 - `restart`: 重启任务（流处理任务）
 
-#### 事件（Events）
+## **《Event 事件》**
 
-事件是任务在不同状态下自动产生的通知，其他 Node 可以通过订阅这些事件来触发自己的行为。
+事件（Event）是任务在执行过程中产生的状态通知。其他节点可以通过订阅这些事件来触发自己的行为。
 
 **所有任务通用事件**：
 
@@ -185,14 +183,14 @@ outputVariables:
 - 流处理任务：`{node_id}.stopped` - 任务被停止
 - 流处理任务：`{node_id}.restarted` - 任务被重启
 
-**事件使用示例**：
+**使用示例**：
 
 ```yaml
 pipeline:
   nodes:
     - id: data_processing
       taskDefinition: spark_etl_v1
-      startWhen: "event:pipeline.started"
+      startWhen: "event:pipeline.started"        # 订阅 Pipeline 启动事件
   
     - id: quality_check
       taskDefinition: quality_validator_v1
@@ -206,13 +204,13 @@ pipeline:
   
     - id: deploy
       taskDefinition: deploy_task_v1
-      # 两条路径：质量达标或审批通过
+      # 两条路径：质量达标或审批通过（事件汇聚）
       startWhen: "event:quality_check.completed || event:manual_review.approved"
 ```
 
-### TaskDefinition 的复用
+### 任务定义的复用
 
-TaskDefinition 可以被多个 Pipeline 的多个 Node 引用：
+任务定义可以被多个流水线的多个节点引用：
 
 ```yaml
 # TaskDefinition（全局定义）
@@ -250,15 +248,15 @@ pipeline:
 ## 不变式
 
 - **复合键全局唯一**：`namespace:name:version` 三元组在系统中全局唯一。
-- **DRAFT 版本唯一性**：每个 `namespace:name` 组合最多只有一个 DRAFT 版本（`version=draft`）。
-- **PUBLISHED 版本不可变**：状态为 PUBLISHED 的任务定义完全不可修改。
-- **引用约束**：已被任何 Pipeline 引用的 PUBLISHED 版本不允许删除。
+- **草稿版本唯一性**：每个 `namespace:name` 组合最多只有一个草稿版本（`version=draft`）。
+- **已发布版本不可变**：状态为已发布的任务定义完全不可修改。
+- **引用约束**：已被任何流水线引用的已发布版本不允许删除。
 
-## 事件
+## 领域事件
 
-- `TaskDefinitionCreated` - 任务定义已创建（DRAFT 版本）
-- `TaskDefinitionModified` - 任务定义已修改（DRAFT 版本）
-- `TaskDefinitionPublished` - 任务定义已发布（新增 PUBLISHED 版本）
+- `TaskDefinitionCreated` - 任务定义已创建（草稿版本）
+- `TaskDefinitionModified` - 任务定义已修改（草稿版本）
+- `TaskDefinitionPublished` - 任务定义已发布（新增已发布版本）
 
 **TODO**：补充事件的消息体结构（EventPayload）定义
 
@@ -283,7 +281,7 @@ Content-Type: application/json
 ```
 
 **说明**：
-创建一个新的任务定义。系统会自动创建一个 `version=draft` 的 DRAFT 版本，此版本处于草稿状态，允许修改但不允许被 Pipeline 引用。
+创建一个新的任务定义。系统会自动创建一个 `version=draft` 的草稿版本,此版本处于草稿状态,允许修改但不允许被流水线引用。
 
 **返回**：
 
@@ -305,8 +303,8 @@ Content-Type: application/json
 **业务规则**：
 
 - `namespace:name` 的组合必须全局唯一（如果已存在，返回 409 Conflict）
-- type 决定了 executionDefinition 需要哪些配置
-- 初始化时 DRAFT 版本的 inputVariables、outputVariables、executionDefinition 都为空，需要通过 ModifyTaskDefinition 填充
+- 任务类型决定了执行定义需要哪些配置
+- 初始化时草稿版本的输入变量、输出变量、执行定义都为空，需要通过 `ModifyTaskDefinition` 填充
 
 ---
 
@@ -330,7 +328,7 @@ Content-Type: application/json
 ```
 
 **说明**：
-修改任务定义的 DRAFT 版本。只有 `version=draft` 的 DRAFT 版本允许被修改，PUBLISHED 版本是不可变的。
+修改任务定义的草稿版本。只有 `version=draft` 的草稿版本允许被修改，已发布版本是不可变的。
 
 **返回**：
 
@@ -409,10 +407,10 @@ Content-Type: application/json
 
 **业务规则**：
 
-- 必须存在 DRAFT 版本才能发布
+- 必须存在草稿版本才能发布
 - 版本号必须遵循语义化版本规范（major.minor.patch）
 - 版本号必须大于该任务的所有已发布版本（递增原则）
-- 发布后 PUBLISHED 版本不可修改
+- 发布后已发布版本不可修改
 
 ## 任务查询
 

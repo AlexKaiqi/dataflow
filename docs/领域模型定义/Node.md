@@ -2,21 +2,21 @@
 
 ## 概述
 
-**《Node 节点》**是 **《Pipeline 流水线》**中的编排单元，代表工作流中的一个执行点。**《Node 节点》**通过引用 **《TaskDefinition 任务定义》**并配置执行控制逻辑，将可复用的任务模板实例化到具体的业务流程中。
+节点是流水线中的编排单元，代表工作流中的一个执行点。节点通过引用任务定义并配置执行控制逻辑,将可复用的任务模板实例化到具体的业务流程中。
 
 ### 核心职责
 
-- **引用任务定义**：通过 **《TaskDefinition 任务定义》**引用声明"要做什么"
-- **绑定输入变量**：指定任务输入从哪里来（上游输出、**《Pipeline 流水线》**输入、常量）
-- **控制执行时机**：通过 **《Expression 表达式》**（startWhen、stopWhen 等）定义"何时执行"
-- **定义依赖关系**：通过 **《Event 事件》**订阅隐式定义与其他 **《Node 节点》**的依赖关系
+- **引用任务定义**：通过任务定义引用声明"要做什么"
+- **绑定输入变量**：指定任务输入从哪里来（上游输出、流水线输入、常量）
+- **控制执行时机**：通过表达式（startWhen、stopWhen 等）定义"何时执行"
+- **定义依赖关系**：通过事件订阅隐式定义与其他节点的依赖关系
 
 ### 设计原则
 
-**《Node 节点》是 《TaskDefinition 任务定义》的实例化**：
+**节点是任务定义的实例化**：
 
-- **《TaskDefinition 任务定义》**：定义"能做什么"（可复用的任务模板）
-- **《Node 节点》**：定义"何时做、如何做"（任务在 **《Pipeline 流水线》**中的实例化配置）
+- 任务定义：定义"能做什么"（可复用的任务模板）
+- 节点：定义"何时做、如何做"（任务在流水线中的实例化配置）
 
 **类比**：
 
@@ -34,17 +34,17 @@ Node = 函数调用 + 调用条件
       )
 ```
 
-## **《Node 节点》**与 **《TaskDefinition 任务定义》**的关系
+## 节点与任务定义的关系
 
-| 维度 | **《TaskDefinition 任务定义》** | **《Node 节点》** |
+| 维度 | 任务定义 | 节点 |
 |------|---------------|------|
-| **定义** | 可复用的任务模板 | 任务在 **《Pipeline 流水线》**中的实例 |
-| **位置** | 独立存在，可跨 **《Pipeline 流水线》**复用 | 存在于 **《PipelineDefinition 流水线定义》**.nodes 中 |
+| **定义** | 可复用的任务模板 | 任务在流水线中的实例 |
+| **位置** | 独立存在，可跨流水线复用 | 存在于流水线定义的 nodes 中 |
 | **职责** | "能做什么"：定义行为、输入输出 | "何时做、如何做"：控制执行时机 |
-| **变量** | 声明需要什么输入（**《VariableDefinition 变量定义》**） | 绑定输入从哪里来（inputBindings） |
-| **事件** | 定义产生什么 **《Event 事件》**（outputEvents） | 订阅哪些 **《Event 事件》**（startWhen 中引用） |
-| **复用性** | 可被多个 **《Pipeline 流水线》**的多个 **《Node 节点》**引用 | 仅属于特定 **《Pipeline 流水线》** |
-| **修改影响** | 影响所有引用该定义的 **《Node 节点》** | 仅影响当前 **《Pipeline 流水线》** |
+| **变量** | 声明需要什么输入（变量定义） | 绑定输入从哪里来（inputBindings） |
+| **事件** | 定义产生什么事件（outputEvents） | 订阅哪些事件（startWhen 中引用） |
+| **复用性** | 可被多个流水线的多个节点引用 | 仅属于特定流水线 |
+| **修改影响** | 影响所有引用该定义的节点 | 仅影响当前流水线 |
 
 ## 领域模型结构
 
@@ -141,15 +141,15 @@ inputBindings:
 - 常量值：直接写值（字符串、数字、布尔等）
 - 表达式计算：`{{ node_a.count + node_b.count }}`
 
-### startWhen（启动控制）
+### startWhen（启动条件）
 
-`startWhen` 定义 Node 何时开始执行，是**唯一必填**的控制表达式：
+`startWhen` 定义节点何时开始执行，是**唯一必填**的执行控制表达式：
 
 ```yaml
 # 等待单个上游完成
 startWhen: "event:extract.completed"
 
-# 等待多个上游完成（Join）
+# 等待多个上游完成（汇聚模式）
 startWhen: "event:branch_a.completed && event:branch_b.completed"
 
 # 条件分支：高质量数据直接处理
@@ -162,39 +162,39 @@ startWhen: "event:quality_check.completed && {{ quality_check.score <= 0.9 }}"
 startWhen: "event:high_quality_path.completed || event:approval.approved"
 ```
 
-**事件来源**：
+**事件源**：
 
-- 其他 Node 产生的事件：`event:node_id.event_name`
-- Pipeline 级别事件：`event:pipeline.started`
+- 其他节点产生的事件：`event:node_id.event_name`
+- 流水线级别事件：`event:pipeline.started`
 - 定时触发：`cron:0 2 * * *`
 
 详见 [Expression.md](./Expression.md) 和 [Event.md](./Event.md)
 
-### stopWhen（停止控制）
+### stopWhen（停止条件）
 
-`stopWhen` 定义流处理任务何时停止，**仅适用于 streaming 类型的 TaskDefinition**：
+`stopWhen` 定义流处理任务何时停止，仅适用于流处理任务类型：
 
 ```yaml
 stopWhen: "event:upstream_source.stopped || {{ error_rate > 0.1 }}"
 ```
 
-### restartWhen（重启控制）
+### restartWhen（重启条件）
 
-`restartWhen` 定义流处理任务何时重启，**仅适用于 streaming 类型的 TaskDefinition**：
+`restartWhen` 定义流处理任务何时重启，仅适用于流处理任务类型：
 
 ```yaml
 restartWhen: "event:config_updated.triggered"
 ```
 
-### retryWhen（重试控制）
+### retryWhen（重试条件）
 
-`retryWhen` 定义任务失败后何时重试，**不适用于 approval 类型的 TaskDefinition**：
+`retryWhen` 定义任务失败后何时重试，不适用于审批任务类型：
 
 ```yaml
 retryWhen: "{{ attempts < 3 && error_type == 'transient' }}"
 ```
 
-### alertWhen（告警控制）
+### alertWhen（告警条件）
 
 `alertWhen` 定义何时发送告警，不影响任务执行：
 

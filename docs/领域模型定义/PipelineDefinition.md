@@ -3,37 +3,37 @@
 
 ## 概述
 
-**《PipelineDefinition 流水线定义》**是编排聚合根，定义了数据处理流水线的完整结构。它通过一系列 **《Node 节点》**来组织执行流程，每个 **《Node 节点》**引用一个 **《TaskDefinition 任务定义》**并通过事件驱动的方式控制执行顺序和依赖关系。
+流水线定义是编排聚合根，定义了数据处理流水线的完整结构。它通过一系列节点来组织执行流程，每个节点引用一个任务定义并通过事件驱动的方式控制执行顺序和依赖关系。
 
 **核心特点**：
 
-- **事件驱动编排**：**《Node 节点》**之间不使用显式的 ConditionNode、JoinNode、ForkNode，而是通过 `startWhen` **《Expression 表达式》**订阅 **《Event 事件》**来实现控制流
-- **可复用的任务模板**：**《Node 节点》**引用 **《TaskDefinition 任务定义》**，**《TaskDefinition 任务定义》**可跨 **《Pipeline 流水线》**复用
+- **事件驱动编排**：节点之间不使用显式的 ConditionNode、JoinNode、ForkNode，而是通过 `startWhen` 表达式订阅事件来实现控制流
+- **可复用的任务模板**：节点引用任务定义，任务定义可跨流水线复用
 - **版本管理**：支持 DRAFT 和 PUBLISHED 状态的版本控制
-- **输入/输出定义**：**《Pipeline 流水线》**可作为"黑盒"被其他 **《Pipeline 流水线》**引用（类似于 **《TaskDefinition 任务定义》**）
+- **输入/输出定义**：流水线可作为"黑盒"被其他流水线引用（类似于任务定义）
 
 ## 核心职责
 
-1. **定义节点列表**：**《Pipeline 流水线》**由一组 **《Node 节点》**组成，每个 **《Node 节点》**引用一个 **《TaskDefinition 任务定义》**
-2. **事件驱动编排**：**《Node 节点》**通过 `startWhen` **《Expression 表达式》**订阅上游 **《Event 事件》**，实现依赖控制
-3. **输入/输出接口**：定义 **《Pipeline 流水线》**级别的输入和输出变量，支持嵌套复用
+1. **定义节点列表**：流水线由一组节点组成，每个节点引用一个任务定义
+2. **事件驱动编排**：节点通过 `startWhen` 表达式订阅上游事件，实现依赖控制
+3. **输入/输出接口**：定义流水线级别的输入和输出变量，支持嵌套复用
 4. **版本管理**：维护 DRAFT 和 PUBLISHED 版本，确保已发布版本不可变
 
 ## 设计原则
 
-1. **扁平化结构**：**《Pipeline 流水线》**只有 `nodes[]` 数组，没有单独的 `tasks` 数组
-2. **事件订阅模式**：依赖关系通过 `startWhen` **《Event 事件》** **《Expression 表达式》**隐式定义，而非显式的 `dependsOn` 字段
-3. **无显式控制节点**：不需要 ConditionNode、JoinNode、ForkNode，所有控制流通过 **《Expression 表达式》**实现
-4. **任务复用**：**《TaskDefinition 任务定义》**独立于 **《Pipeline 流水线》**存在，可被多个 **《Pipeline 流水线》**引用
+1. **扁平化结构**：流水线只有 `nodes[]` 数组，没有单独的 `tasks` 数组
+2. **事件订阅模式**：依赖关系通过 `startWhen` 事件表达式隐式定义，而非显式的 `dependsOn` 字段
+3. **无显式控制节点**：不需要 ConditionNode、JoinNode、ForkNode，所有控制流通过表达式实现
+4. **任务复用**：任务定义独立于流水线存在，可被多个流水线引用
 
-## **《Pipeline 流水线》**与 **《Node 节点》**的关系
+## 流水线与节点的关系
 
-| 维度 | **《PipelineDefinition 流水线定义》** | **《Node 节点》** |
+| 维度 | 流水线定义 | 节点 |
 |------|-------------------|------|
 | 定义 | 编排的整体结构 | 编排中的单个执行单元 |
 | 职责 | 定义"有哪些节点" | 定义"何时执行、如何执行" |
-| 复用性 | 可作为整体被其他 **《Pipeline 流水线》**引用 | 引用可复用的 **《TaskDefinition 任务定义》** |
-| 控制流 | 通过 nodes 数组组织 | 通过 startWhen 订阅上游 **《Event 事件》** |
+| 复用性 | 可作为整体被其他流水线引用 | 引用可复用的任务定义 |
+| 控制流 | 通过 nodes 数组组织 | 通过 startWhen 订阅上游事件 |
 
 ## 领域模型结构
 
@@ -176,14 +176,14 @@ outputVariables:
     description: "数据质量评分"
 ```
 
-### versions（版本管理）
+### 版本管理
 
-Pipeline 支持版本管理，每个版本有独立的 `nodes`、`inputVariables`、`outputVariables`。
+流水线支持版本管理，每个版本有独立的 `nodes`、`inputVariables`、`outputVariables`。
 
 **版本状态**：
 
-- **DRAFT**：草稿版本，可以修改，最多只有一个
-- **PUBLISHED**：已发布版本，不可变，可以有多个
+- DRAFT（草稿）：草稿版本，可以修改，最多只有一个
+- PUBLISHED（已发布）：已发布版本，不可变，可以有多个
 
 **版本示例**：
 
@@ -312,11 +312,11 @@ PipelineDefinition:
 
 **控制流说明**：
 
-- **顺序执行**：`extract` → `transform` → `quality_check`（通过 `startWhen` 订阅上游 `completed` 事件）
-- **条件分支**：质量检查后根据评分分为两条路径
+- 顺序执行：`extract` → `transform` → `quality_check`（通过 startWhen 订阅上游 `completed` 事件）
+- 条件分支：质量检查后根据评分分为两条路径
   - 高质量路径：`quality_check.score > 0.9` 触发 `publish_high_quality`
   - 低质量路径：`quality_check.score <= 0.9` 触发 `approval`
-- **汇聚（Join）**：`notify` 订阅两条路径的完成事件，任意一条完成即触发
+- 汇聚模式：`notify` 订阅两条路径的完成事件，任意一条完成即触发（OR 运算）
 
 ## 不变式（Invariants）
 
@@ -325,57 +325,57 @@ PipelineDefinition:
    - `namespace + name` 组合全局唯一
    - 同一 version 内，`nodes[].id` 必须唯一
 
-2. **版本控制约束**
-   - DRAFT 版本最多一个
-   - PUBLISHED 版本不可变
+2. 版本控制约束
+   - 草稿版本最多一个
+   - 已发布版本不可变
    - 版本号必须遵循语义化版本规范（如 "1.0.0"）
 
-3. **节点引用有效性**
-   - `node.taskDefinition.ref` 引用的 TaskDefinition 必须存在且已发布
-   - `inputBindings` 中的 key 必须对应 TaskDefinition 的 `inputVariables`
-   - TaskDefinition 的必填输入变量必须在 `inputBindings` 中绑定
+3. 节点引用有效性
+   - `node.taskDefinition.ref` 引用的任务定义必须存在且已发布
+   - 输入绑定中的 key 必须对应任务定义的输入变量
+   - 任务定义的必填输入变量必须在输入绑定中绑定
 
-4. **事件可达性**
-   - `startWhen` 中引用的事件必须由某个 Node 产生（或由 Pipeline 产生）
-   - Pipeline 必须有至少一个 Node 订阅 `event:pipeline.started`（起始节点）
+4. 事件可达性
+   - startWhen 中引用的事件必须由某个节点产生（或由流水线产生）
+   - 流水线必须有至少一个节点订阅 `event:pipeline.started`（起始节点）
 
-5. **输出变量一致性**
-   - Pipeline 的 `outputVariables` 必须由某个 Node 的输出提供
-   - 输出变量的绑定通常在 Pipeline 执行结束时计算
+5. 输出变量一致性
+   - 流水线的输出变量必须由某个节点的输出提供
+   - 输出变量的绑定通常在流水线执行结束时计算
 
 ## 领域事件
 
-- `PipelineDefinitionCreated`：Pipeline 创建（DRAFT 版本）
-- `PipelineDefinitionModified`：Pipeline 修改（DRAFT 版本）
-- `PipelineDefinitionPublished`：Pipeline 发布（新增 PUBLISHED 版本）
+- `PipelineDefinitionCreated`：流水线创建（草稿版本）
+- `PipelineDefinitionModified`：流水线修改（草稿版本）
+- `PipelineDefinitionPublished`：流水线发布（新增已发布版本）
 
 ## 命令和查询
 
-### 创建 Pipeline
+### 创建流水线
 
 ```
 CreatePipelineDefinition(namespace, name, description, owner) -> PipelineDefinition
 ```
 
-创建新的 Pipeline 定义，自动生成 "draft" 版本。
+创建新的流水线定义，自动生成 "draft" 版本。
 
-### 修改 Pipeline
+### 修改流水线
 
 ```
 ModifyPipelineDefinition(pipelineId, inputVariables?, outputVariables?, nodes?) -> PipelineDefinition
 ```
 
-修改 DRAFT 版本的 Pipeline，PUBLISHED 版本不可修改。
+修改草稿版本的流水线，已发布版本不可修改。
 
-### 发布 Pipeline
+### 发布流水线
 
 ```
 PublishPipelineDefinition(pipelineId, version, releaseNotes?) -> PipelineVersion
 ```
 
-将 DRAFT 版本发布为 PUBLISHED 版本，发布后不可变。
+将草稿版本发布为已发布版本，发布后不可变。
 
-### 查询 Pipeline
+### 查询流水线
 
 ```plaintext
 GetPipelineDefinition(namespace, name, version?) -> PipelineDefinition

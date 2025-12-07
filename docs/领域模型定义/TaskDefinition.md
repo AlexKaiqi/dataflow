@@ -1,224 +1,251 @@
-# 聚合根：TaskDefinition（任务定义）
+# TaskDefinition（任务定义）
 
-## 职责
+## 概述
 
-- **任务配置**：定义任务的入参、出参、执行逻辑和执行类型
-- **版本控制**：版本控制
-- **任务复用**：支持跨流水线复用
-- **任务执行**：支持指定输入参数运行任务
-- **执行类型管理**：支持多种执行类型（ray_operator、model_inference、sql、pyspark_operator、flink 等）
+TaskDefinition 是**可复用的任务模板**，定义了一类任务"能做什么"、"需要什么输入"、"产生什么输出"。它是独立于 Pipeline 的领域概念，可以被多个 Pipeline 的多个 Node 引用。
 
-## 核心概念
+### 核心职责
 
-TaskDefinition 是**定义时配置**，描述任务本身的特征和逻辑，包括：
+- **定义任务行为**：描述任务类型及其特有的行为能力（如批处理的 start/retry，流处理的 start/stop/restart）
+- **声明接口契约**：定义输入变量和输出变量，明确任务与外部的数据交互
+- **定义事件规约**：说明任务在不同状态下产生的事件（如 started、completed、failed）
+- **支持版本管理**：允许同一任务有多个版本，支持灰度发布和回滚
+- **支持跨 Pipeline 复用**：一个 TaskDefinition 可以被多个 Pipeline 引用
 
-- 任务需要什么输入/输出（inputVariables/outputVariables）
-- 任务的代码在哪里、如何执行（executionDefinition）
-- 任务的**默认资源需求**（resources，可在 Node 中覆盖）
-- 任务的健康检查规则（healthCheck，仅流式任务）
-- 任务可发布的外部事件（externalEvents，仅外部任务）
+### 设计原则
 
-TaskDefinition 不包含：
+**TaskDefinition 只关心"是什么"，不关心"何时执行"**：
 
-- 具体的输入值（在 Node 中通过 inputBindings 指定）
-- 资源池/集群选择（在 Node 中通过 resourcePool 指定）
-- 执行策略（超时、重试、优先级在 Node 中通过 executionPolicy 指定）
-- 告警配置（在 Node 中通过 alertConfig 指定）
+- ✅ 定义：任务类型、输入输出、执行逻辑
+- ✅ 定义：任务支持哪些行为（actions）
+- ✅ 定义：任务产生哪些事件（events）
+- ❌ 不定义：何时启动（startWhen）
+- ❌ 不定义：何时重试（retryWhen）
+- ❌ 不定义：依赖关系
 
-**资源配置原则**：
+**编排逻辑由 Node 控制**：具体的执行时机、依赖关系、重试策略等编排逻辑在 Pipeline 的 Node 中通过表达式（startWhen、stopWhen 等）定义。
 
-- TaskDefinition 中的 `resources` 是**默认值**，基于典型数据量估算
-- Node 中可通过 `resources` 字段覆盖默认值，适应实际数据规模
-- 建议 TaskDefinition 作者提供 `resourceGuidance`，说明不同数据量的资源建议
-
-## 结构
-
-```text
-TaskDefinition（聚合根）
-├── namespace: string (命名空间，如 "com.company.tasks")
-├── name: string (任务名称，如 "data_cleaner")
-├── version: string (版本号，如 "draft" | "1.0.0" | "1.1.0" | "2.0.0")
-│   # 复合键：namespace + name + version 全局唯一
-│
-├── status: "DRAFT" | "PUBLISHED"
-├── type: string (任务类型: "ray_operator" | "model_inference" | "sql" | "pyspark_operator" | "flink_sql" | "flink_jar")
-├── inputVariables: VariableDefinition[]  # 输入参数定义
-├── outputVariables: VariableDefinition[] # 输出结果定义
-├── executionDefinition: object           # 执行定义（根据 type 不同而不同，见各任务类型文档）
-├── resources: ResourceRequirements       # 资源需求定义
-│   ├── cpu: string                       # CPU 需求（如 "4"、"8"）
-│   ├── memory: string                    # 内存需求（如 "8Gi"、"16Gi"）
-│   ├── gpu: integer?                     # GPU 数量（可选）
-│   └── <engine-specific>: object?        # 引擎特定资源（如 sparkResources、flinkResources）
-├── resourceGuidance: ResourceGuidance?   # 资源配置指导（可选）
-├── externalEvents: ExternalEvent[]?      # 外部事件定义（仅外部任务）
-├── healthCheck: HealthCheckConfig?       # 健康检查配置（仅流式任务）
-├── releaseNotes: string?                 # 版本发布说明
-├── createdAt: Timestamp
-├── createdBy: string
-├── publishedAt: Timestamp?               # 发布时间(仅 PUBLISHED 版本)
-├── publishedBy: string?                  # 发布者(仅 PUBLISHED 版本)
-└── metadata
-    └── description: string
-```
-
-**唯一标识**：`namespace:name:version` 复合键全局唯一
-
-**版本管理**：
-
-- 同一个 `namespace:name` 可以有多个版本
-- 每个版本是独立的 TaskDefinition 实例
-- DRAFT 版本：`namespace:name:draft`（每个任务最多一个 DRAFT 版本）
-- PUBLISHED 版本：`namespace:name:1.0.0`、`namespace:name:1.1.0` 等
-
-## 支持的任务类型
-
-- **[ray_operator](./TaskTypes/RayOperator.md)**: 使用 Ray 的灵活数据处理任务（仅批处理）
-- **[model_inference](./TaskTypes/ModelInference.md)**: 批量模型推理任务，支持特征处理
-- **[sql](./TaskTypes/SQL.md)**: 离线 SQL 查询（Hive、Spark SQL、Presto、Trino）
-- **[pyspark_operator](./TaskTypes/PySparkOperator.md)**: PySpark 大规模数据处理任务
-- **[flink_sql / flink_jar](./TaskTypes/FlinkSQL-FlinkJar.md)**: 实时流处理任务
-
-## 详细字段说明
-
-### resources（资源需求）
-
-定义任务执行所需的**默认资源**，基于典型数据量估算。在 Pipeline 的 Node 中可以覆盖这些默认值。
+## 领域模型结构
 
 ```yaml
-resources:
-  cpu: string                      # CPU 核心数（如 "4"、"8"）
-  memory: string                   # 内存大小（如 "8Gi"、"16Gi"）
-  gpu: integer?                    # GPU 数量（可选）
+TaskDefinition:
+  # 唯一标识
+  namespace: string              # 命名空间，如 "com.company.tasks"
+  name: string                   # 任务名称，如 "data_transform"
+  version: string                # 版本号，如 "1.0.0"
+  # 复合键 namespace:name:version 全局唯一
   
-  # 引擎特定资源（根据任务类型选择）
-  rayResources: object?            # Ray 特定资源（ray_operator）
-  sparkResources: object?          # Spark 特定资源（pyspark_operator、sql）
-  flinkResources: object?          # Flink 特定资源（flink_sql、flink_jar）
-  inferenceResources: object?      # 推理特定资源（model_inference）
-
-# 可选：资源配置指导
-resourceGuidance:
-  description: string              # 默认配置的适用场景说明
-  recommendations:                 # 不同数据量的资源建议
-    - dataSize: string             # 数据量范围（如 "< 10GB"、"10-50GB"）
-      resources: object            # 推荐的资源配置
+  # 基本信息
+  type: TaskType                 # 任务类型（见下文）
+  description: string            # 任务描述
+  
+  # 接口契约
+  inputVariables: List[VariableDefinition]   # 输入变量定义
+  outputVariables: List[VariableDefinition]  # 输出变量定义
+  
+  # 行为定义
+  supportedActions: List[Action]  # 支持的行为（由 type 决定）
+  outputEvents: List[Event]       # 产生的事件（由 type 决定）
+  
+  # 执行定义（类型特定）
+  executionConfig: object         # 根据 type 不同而不同
+  
+  # 元数据
+  createdAt: timestamp
+  createdBy: string
+  status: "DRAFT" | "PUBLISHED"
 ```
 
-**使用说明**：
+## 任务类型（TaskType）
 
-- TaskDefinition 中的 `resources` 是**默认值**，通常基于中等数据量（如 10-50GB）估算
-- 在 Pipeline 的 Node 中可以通过 `resources` 字段**完全覆盖**默认值
-- 建议提供 `resourceGuidance` 帮助用户根据数据量选择合适的资源配置
+不同的任务类型定义了不同的**行为能力**、**事件集合**和**变量特征**：
 
-详见各任务类型文档。
+### 批处理任务
 
-### externalEvents（外部事件声明）
+#### PySpark 任务
 
-用于声明任务可以发布的外部事件（如人工审核完成、外部系统回调等）。仅适用于需要外部系统交互的任务。
+- **行为**：start, retry
+- **事件**：started, completed, failed
+- **输出变量示例**：rows_processed, execution_time
+
+#### SQL 任务
+
+- **行为**：start, retry
+- **事件**：started, completed, failed
+- **输出变量示例**：rows_affected, query_time
+
+#### Ray 任务
+
+- **行为**：start, retry
+- **事件**：started, completed, failed
+- **输出变量示例**：tasks_completed, processing_time
+
+### 流处理任务
+
+#### Streaming 任务
+
+- **行为**：start, stop, restart, retry
+- **事件**：started, stopped, restarted, completed, failed
+- **输出变量示例**：processed_records, current_offset, lag
+
+### 控制流任务
+
+#### Approval 任务
+
+- **行为**：start（启动审批流程）
+- **事件**：started, approved, rejected, timeout
+- **输出变量示例**：approver, approval_time, comments
+
+#### Wait 任务
+
+- **行为**：start
+- **事件**：started, timeout, completed
+- **输出变量示例**：wait_duration
+
+详细说明请参考 [TaskTypes 目录](./TaskTypes/) 下的各任务类型文档。
+
+## 核心概念详解
+
+### 输入/输出变量
+
+TaskDefinition 通过 `inputVariables` 和 `outputVariables` 定义任务与外部的数据接口契约。
+
+#### 输入变量（inputVariables）
+
+定义任务执行需要的输入参数：
 
 ```yaml
-externalEvents:
-  - name: string              # 事件名称（如 approval_done、labeling_completed）
-    description: string       # 事件描述
-    schema: object            # 事件数据的 Schema
+inputVariables:
+  - name: data_path
+    type: string
+    required: true
+    description: "输入数据路径"
+  
+  - name: quality_threshold
+    type: number
+    required: false
+    default: 0.9
+    description: "数据质量阈值"
 ```
 
-系统会自动生成回调端点：
+#### 输出变量（outputVariables）
 
-```http
-POST /api/v1/task-executions/{task_execution_id}/events/{event_name}
-```
-
-**参数说明**：
-
-- `task_execution_id`: TaskExecution 的全局唯一 ID（任务执行实例）
-- `event_name`: 事件名称（在 TaskDefinition 的 externalEvents 中定义）
-
-**说明**：
-
-- TaskExecution 可以是**独立执行**（用于测试、调试），也可以是 **Pipeline 中的执行**
-- `task_execution_id` 全局唯一，无论是否在 Pipeline 中
-- 回调 API 统一，外部系统只需要记住 `task_execution_id`
-
-**示例 1：独立执行**
-
-```bash
-# 1. 创建独立的 Task 执行（测试用）
-POST /api/v1/task-executions
-{
-  "taskDefinitionId": "manual_audit_v1",
-  "taskDefinitionVersion": "1.0.0",
-  "inputs": {
-    "data_path": "s3://test/sample-data.parquet"
-  }
-}
-
-# 响应
-{
-  "taskExecutionId": "task_exec_99999",
-  "status": "waiting_event",
-  "callbackUrl": "/api/v1/task-executions/task_exec_99999/events/approval_done"
-}
-
-# 2. 外部系统回调
-POST /api/v1/task-executions/task_exec_99999/events/approval_done
-{
-  "status": "approved",
-  "reviewer": "alice",
-  "comment": "测试数据审核通过"
-}
-```
-
-**示例 2：Pipeline 中执行**
-
-```bash
-# 1. 启动 Pipeline 执行
-POST /api/v1/pipeline-executions
-{
-  "pipelineDefinitionId": "data_processing_v1",
-  "inputs": {...}
-}
-
-# 响应（包含各个 Node 的 TaskExecution ID）
-{
-  "pipelineExecutionId": "pipe_exec_789",
-  "nodes": [
-    {
-      "nodeAlias": "manual_audit",
-      "taskExecutionId": "task_exec_002",
-      "status": "waiting_event",
-      "callbackUrl": "/api/v1/task-executions/task_exec_002/events/approval_done"
-    }
-  ]
-}
-
-# 2. 外部系统回调（使用 TaskExecution ID）
-POST /api/v1/task-executions/task_exec_002/events/approval_done
-{
-  "status": "approved",
-  "reviewer": "bob",
-  "comment": "数据质量良好，批准处理"
-}
-
-# 系统自动关联到 Pipeline，继续执行下游节点
-```
-
-### healthCheck（健康检查配置）
-
-用于流式任务的健康检查，系统会周期性检查并发布 `statusChanged` 事件。仅适用于 `flink_sql` 和 `flink_jar` 任务。
+定义任务执行后产生的输出变量：
 
 ```yaml
-healthCheck:
-  enabled: boolean            # 是否启用健康检查
-  interval: integer           # 检查间隔（秒）
-  endpoint: string?           # 健康检查端点（可选）
-  timeout: integer?           # 检查超时（秒，默认 10）
-  healthyThreshold: integer?  # 连续成功次数判定为健康（默认 1）
-  unhealthyThreshold: integer? # 连续失败次数判定为不健康（默认 3）
+outputVariables:
+  - name: rows_processed
+    type: integer
+    description: "处理的数据行数"
+  
+  - name: quality_score
+    type: number
+    description: "数据质量分数"
+  
+  - name: output_path
+    type: string
+    description: "输出数据路径"
 ```
 
-详见 [FlinkSQL-FlinkJar](./TaskTypes/FlinkSQL-FlinkJar.md) 文档。
+**重要说明**：
+
+- 输入变量在 Node 中通过表达式绑定具体值
+- 输出变量在任务执行完成后自动写入上下文，供下游 Node 使用
+- 输出变量可以在其他 Node 的 `startWhen`、`stopWhen` 等表达式中引用
+
+### 行为与事件
+
+#### 行为（Actions）
+
+行为是任务可以被触发执行的操作，不同任务类型支持不同的行为：
+
+**所有任务通用**：
+
+- `start`: 启动任务执行
+
+**特定任务类型**：
+
+- `retry`: 重试失败的任务（批处理任务）
+- `stop`: 停止运行中的任务（流处理任务）
+- `restart`: 重启任务（流处理任务）
+
+#### 事件（Events）
+
+事件是任务在不同状态下自动产生的通知，其他 Node 可以通过订阅这些事件来触发自己的行为。
+
+**所有任务通用事件**：
+
+- `{node_id}.started`: 任务开始执行
+- `{node_id}.completed`: 任务成功完成（或 `approved` 对于审批任务）
+- `{node_id}.failed`: 任务执行失败（或 `rejected` 对于审批任务）
+
+**特定任务类型事件**：
+
+- 审批任务：`{node_id}.timeout` - 审批超时
+- 流处理任务：`{node_id}.stopped` - 任务被停止
+- 流处理任务：`{node_id}.restarted` - 任务被重启
+
+**事件使用示例**：
+
+```yaml
+pipeline:
+  nodes:
+    - id: data_processing
+      taskDefinition: spark_etl_v1
+      startWhen: "event:pipeline.started"
+    
+    - id: quality_check
+      taskDefinition: quality_validator_v1
+      # 等待上游完成事件 + 检查输出变量
+      startWhen: "event:data_processing.completed && {{ data_processing.quality_score > 0.9 }}"
+    
+    - id: manual_review
+      taskDefinition: approval_task_v1
+      # 质量不达标时需要人工审批
+      startWhen: "event:data_processing.completed && {{ data_processing.quality_score <= 0.9 }}"
+    
+    - id: deploy
+      taskDefinition: deploy_task_v1
+      # 两条路径：质量达标或审批通过
+      startWhen: "event:quality_check.completed || event:manual_review.approved"
+```
+
+### TaskDefinition 的复用
+
+TaskDefinition 可以被多个 Pipeline 的多个 Node 引用：
+
+```yaml
+# TaskDefinition（全局定义）
+taskDefinition:
+  namespace: com.company
+  name: quality_approval
+  version: "1.0.0"
+  type: approval
+  inputVariables:
+    - name: data_summary
+      type: object
+  outputVariables:
+    - name: approver
+      type: string
+    - name: approval_time
+      type: timestamp
+
+# Pipeline 1
+pipeline:
+  name: pipeline_a
+  nodes:
+    - id: review_step_1
+      taskDefinition: com.company:quality_approval:1.0.0
+      startWhen: "event:transform.completed"
+
+# Pipeline 2
+pipeline:
+  name: pipeline_b
+  nodes:
+    - id: final_review
+      taskDefinition: com.company:quality_approval:1.0.0  # 复用同一个定义
+      startWhen: "event:last_step.completed"
+```
 
 ## 不变式
 

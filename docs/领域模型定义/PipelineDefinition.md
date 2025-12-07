@@ -1,452 +1,424 @@
 
-# 聚合根：PipelineDefinition（工作流定义）
+# PipelineDefinition（流水线定义）
 
-## 职责
+## 概述
 
-- **任务编排**：通过 Node（节点）组织执行流程，每个 Node 可以是任务节点、条件节点或并行节点
-- **输出定义**：定义工作流作为整体的输出变量（可选，用于工作流被作为任务复用时）
-- **版本控制**：独立于任务的版本管理
-- **变量绑定**：通过 Node 中的 VariableReference 定义运行时参数绑定
+PipelineDefinition 是**编排聚合根**，定义了数据处理流水线的完整结构。它通过一系列 Node（节点）来组织执行流程，每个 Node 引用一个 TaskDefinition 并通过**事件驱动**的方式控制执行顺序和依赖关系。
 
-## 核心概念
+**核心特点**：
 
-### Node（节点）
+- **事件驱动编排**：Node 之间不使用显式的 ConditionNode、JoinNode、ForkNode，而是通过 `startWhen` 表达式订阅事件来实现控制流
+- **可复用的任务模板**：Node 引用 TaskDefinition，TaskDefinition 可跨 Pipeline 复用
+- **版本管理**：支持 DRAFT 和 PUBLISHED 状态的版本控制
+- **输入/输出定义**：Pipeline 可作为"黑盒"被其他 Pipeline 引用（类似于 TaskDefinition）
 
-Node 是 Pipeline 中的执行单元，代表工作流中的一个"实例化的任务"。区别于 TaskDefinition（任务定义），Node 包含：
+## 核心职责
 
-- **任务引用**：指向具体的 TaskDefinition
-- **变量绑定**：通过 VariableReference 定义该节点的输入参数如何从上游获取
-- **执行策略**：节点级别的执行配置（覆盖 TaskDefinition 的默认策略）
+1. **定义节点列表**：Pipeline 由一组 Node 组成，每个 Node 引用一个 TaskDefinition
+2. **事件驱动编排**：Node 通过 `startWhen` 表达式订阅上游事件，实现依赖控制
+3. **输入/输出接口**：定义 Pipeline 级别的输入和输出变量，支持嵌套复用
+4. **版本管理**：维护 DRAFT 和 PUBLISHED 版本，确保已发布版本不可变
 
-**Node vs TaskDefinition**：
+## 设计原则
 
-| 维度 | TaskDefinition | Node |
-|------|---------------|------|
-| 定义 | 可复用的任务模板 | 任务在 Pipeline 中的实例 |
-| 位置 | 独立存在，跨 Pipeline 复用 | 存在于 PipelineDefinition 中 |
-| 职责 | 声明"需要什么输入" | 指定"输入从哪里来" |
-| 变量 | VariableDefinition（协议） | VariableReference（绑定） |
+1. **扁平化结构**：Pipeline 只有 `nodes[]` 数组，没有单独的 `tasks` 数组
+2. **事件订阅模式**：依赖关系通过 `startWhen` 事件表达式隐式定义，而非显式的 `dependsOn` 字段
+3. **无显式控制节点**：不需要 ConditionNode、JoinNode、ForkNode，所有控制流通过表达式实现
+4. **任务复用**：TaskDefinition 独立于 Pipeline 存在，可被多个 Pipeline 引用
 
-## 结构
+## Pipeline 与 Node 的关系
 
-```text
-PipelineDefinition（聚合根）
-├── id: string (全局唯一标识)
-├── namespace: string (如 "com.company.pipelines")
-├── name: string (工作流名称)
-├── versions[]
-│   ├── version: string ("draft" | "1.0.0" | "1.1.0" 等)
-│   ├── status: "DRAFT" | "PUBLISHED"
-│   ├── inputVariables: VariableDefinition[]  # 工作流级输入变量定义
-│   ├── outputVariables: VariableDefinition[]  # 工作流级输出变量定义
-│   │
-│   ├── nodes[]  # 节点列表（取代原 taskReferences）
-│   │   ├── alias: string (节点别名，在 Pipeline 内唯一)
-│   │   ├── type: "task" | "condition" | "parallel"  # 节点类型
-│   │   │
-│   │   ├── dependsOn: string[]  # 该节点依赖的上游节点别名列表
-│   │   │   # 空数组表示入度为 0 的起始节点
-│   │   │   # 执行引擎会验证依赖的节点都存在且无循环依赖
-│   │   │   # 系统可选地从 inputs 中的 VariableReference 自动推断依赖
-│   │   │
-│   │   ├── taskRef: object (当 type="task" 时必需)
-│   │   │   ├── namespace: string (所引用任务的 namespace)
-│   │   │   ├── name: string (所引用任务的 name)
-│   │   │   └── version: string (所引用任务的版本，必须是 PUBLISHED 版本)
-│   │   │
-│   │   ├── inputs: Map<string, VariableReference>  # 输入变量绑定
-│   │   │   # key: 变量名（对应 TaskDefinition.inputVariables 中的 name）
-│   │   │   # value: VariableReference 对象，定义该变量的来源和转换
-│   │   │   # 示例: {"model_version": VariableReference(expression="{{pipe.model_version}}")}
-│   │   │
-│   │   ├── condition: object (当 type="condition" 时必需)
-│   │   │   ├── expression: string (条件表达式，Jinja2 语法)
-│   │   │   │   # 示例: "{{node_a.status == 'success' && node_a.count > 100}}"
-│   │   │   └── variableReferences: VariableReference[]  # 条件中引用的变量
-│   │   │
-│   │   ├── parallelBranches: object (当 type="parallel" 时必需)
-│   │   │   ├── branches: string[]  # 并行分支的节点别名列表
-│   │   │   └── joinStrategy: "all" | "any" | "majority"  # 汇合策略
-│   │   │
-│   │   ├── executionPolicy: object (节点级执行策略，覆盖 Task 默认值)
-│   │   │   ├── maxRetries: integer (最大重试次数)
-│   │   │   ├── timeout: integer (超时时间，秒)
-│   │   │   ├── resourceId: string (执行资源标识)
-│   │   │   └── alarmConfig: object (告警配置)
-│   │   │
-│   │   └── description: string (节点描述)
-│   │
-│   ├── releaseNotes: string
-│   ├── createdAt: Timestamp
-│   └── createdBy: string (仅 PUBLISHED 版本有值)
-│
-└── metadata
-    ├── owners: string[]
-    ├── tags: string[]
-    └── createdAt: Timestamp
-```
+| 维度 | PipelineDefinition | Node |
+|------|-------------------|------|
+| 定义 | 编排的整体结构 | 编排中的单个执行单元 |
+| 职责 | 定义"有哪些节点" | 定义"何时执行、如何执行" |
+| 复用性 | 可作为整体被其他 Pipeline 引用 | 引用可复用的 TaskDefinition |
+| 控制流 | 通过 nodes 数组组织 | 通过 startWhen 订阅上游事件 |
 
-## 不变式
-
-1. **唯一性**
-   - pipelineId 全局唯一
-   - namespace + name 的组合全局唯一
-   - 同一 version 内，nodes[].alias 必须唯一
-
-2. **版本控制**
-   - pipelineId + version 必须指向唯一的版本
-   - DRAFT 版本最多一个
-
-3. **节点类型约束**
-   - 当 node.type = "task" 时，必须有 taskRef 和 inputs
-   - 当 node.type = "condition" 时，必须有 condition
-   - 当 node.type = "parallel" 时，必须有 parallelBranches
-
-4. **依赖一致性**
-   - nodes 中 taskRef 引用的 TaskDefinition 必须存在且已发布
-   - node.dependsOn 中的节点别名必须存在于 nodes 中
-   - 所有节点的 dependsOn 关系必须形成有向无环图（DAG），不允许循环依赖
-   - 入度为 0 的节点（起始节点）其 dependsOn 为空数组
-
-5. **变量绑定一致性**
-   - node.inputs 中的 key 必须对应 TaskDefinition.inputVariables 中声明的变量
-   - TaskDefinition 中 required=true 的变量，必须在 node.inputs 中提供绑定
-   - VariableReference 中引用的上游节点必须在该节点的 dependsOn 中声明（或可被推断）
-   - 建议：inputs 中引用的节点应该在 dependsOn 中显式声明，保持一致性
-
-6. **条件节点约束**
-   - condition.expression 中引用的所有节点，必须在该节点的 dependsOn 中声明
-   - condition.variableReferences 必须包含 expression 中所有变量的解析
-
-7. **状态转移**
-   - DRAFT 状态可以修改
-   - PUBLISHED 状态不可变，只能基于其创建新的 DRAFT 版本
-
-## 事件
-
-- `PipelineDefinitionCreated` - 工作流定义已创建（DRAFT 版本）
-- `PipelineDefinitionModified` - 工作流定义已修改（DRAFT 版本）
-- `PipelineDefinitionPublished` - 工作流定义已发布（新增 PUBLISHED 版本）
-
-## 命令
-
-### CreatePipelineDefinition 命令
-
-**参数**：
-
-- `namespace` (string，必需)：工作流的命名空间，如 "com.company.pipelines"
-- `name` (string，必需)：工作流的名称，在同一 namespace 内唯一
-- `description` (string，可选)：工作流的描述
-- `owner` (string，必需)：工作流的所有者
-
-**说明**：
-创建一个新的工作流定义。系统会自动生成一个版本号为 "draft" 的 DRAFT 版本，此版本处于草稿状态。
-
-**返回**：
-返回新创建的 PipelineDefinition 对象，包含自动生成的 pipelineId 和 DRAFT 版本。
-
-**业务规则**：
-
-- namespace + name 的组合必须全局唯一
-- 初始化时 DRAFT 版本的 inputVariables、outputVariables、nodes、edges 都为空
-
----
-
-### ModifyPipelineDefinition 命令
-
-**参数**：
-
-- `pipelineId` (string，必需)：要修改的工作流 ID
-- `inputVariables` (VariableDefinition[]，可选)：修改工作流输入变量定义
-- `outputVariables` (VariableDefinition[]，可选)：修改工作流输出变量定义
-- `nodes` (Node[]，可选)：修改节点列表（包含每个节点的 dependsOn）
-- `description` (string，可选)：修改描述信息
-
-**说明**：
-修改工作流定义的 DRAFT 版本。只有 DRAFT 版本允许被修改，已发布的版本是不可变的。
-
-**返回**：
-返回修改后的 PipelineDefinition 对象。
-
-**业务规则**：
-
-- 只能修改 DRAFT 版本，已发布的版本不允许修改
-- nodes 中 taskRef 引用的 TaskDefinition 必须存在且已发布
-- nodes 的 dependsOn 关系必须形成有向无环图（DAG），不允许循环依赖
-- 节点的 inputs 绑定必须满足 TaskDefinition 的 inputVariables 要求
-- VariableReference 中引用的上游节点必须在该节点的 dependsOn 中声明
-
----
-
-### PublishPipelineDefinition 命令
-
-**参数**：
-
-- `pipelineId` (string，必需)：要发布的工作流 ID
-- `version` (string，必需)：发布后的版本号，必须遵循语义化版本规范（如 "1.0.0"）
-- `releaseNotes` (string，可选)：发布说明
-
-**说明**：
-将工作流定义的 DRAFT 版本发布为正式版本。发布后该版本变为不可变。
-
-**返回**：
-返回新发布的 PipelineDefinition 版本对象。
-
-**业务规则**：
-
-- 必须存在 DRAFT 版本才能发布
-- 版本号必须大于所有已发布的版本号（递增原则）
-- 发布后自动创建一个新的 DRAFT 版本供后续修改
-
----
-
-## 查询
-
-### GetPipelineDefinition
-
-**参数**：
-
-- `namespace` (string，必需)：工作流的命名空间
-- `name` (string，必需)：工作流的名称
-- `version` (string，可选)：工作流的版本号。如不指定，默认返回 DRAFT 版本；如指定具体版本号，则返回对应的已发布版本
-
-**说明**：
-按工作流地址（namespace + name + version）获取单个工作流定义。
-
-**返回**：
-返回匹配的 PipelineDefinition 对象，包含完整的版本信息、任务引用、依赖关系等。
-
-**业务规则**：
-
-- 若指定 version 参数，必须是已发布的版本号或 "draft"
-- 若不指定 version 参数，返回该工作流族最新的 DRAFT 版本；如果没有 DRAFT 版本，返回最新的 PUBLISHED 版本
-
-**使用场景**：
-
-- 获取工作流定义用于执行
-- 前端页面展示工作流详情
-
-### ListPipelineVersions
-
-**参数**：
-
-- `pipelineId` (string，必需)：工作流的全局唯一标识符
-- `limit` (integer)：返回结果的最大数量，默认 100
-- `offset` (integer)：分页偏移量，默认 0
-
-**说明**：
-列出某个工作流的所有版本，包括 DRAFT 版本和所有 PUBLISHED 版本。
-
-**返回**：
-返回版本列表，每个版本包含版本号、状态、创建时间等元数据。
-
-**业务规则**：
-
-- 返回的版本按时间倒序排列
-- DRAFT 版本最多只有一个
-- 版本号遵循语义化版本规范
-
-**使用场景**：
-
-- 查看工作流的版本演变历史
-- 选择特定版本的工作流
-
-### GetPipelineWithNodeDetails
-
-**参数**：
-
-- `pipelineId` (string，必需)：工作流 ID
-- `version` (string，可选)：版本号，不指定时返回 DRAFT 版本
-
-**说明**：
-返回工作流定义并展开所有节点的 taskRef 为完整的 TaskDefinition（用于前端展示和验证）。
-
-**返回**：
-完整的工作流定义，包含展开后的所有节点和任务详情。
-
-```json
-{
-  "id": "pipeline-123",
-  "namespace": "com.company.pipelines",
-  "name": "data_processing",
-  "version": "1.0.0",
-  "nodes": [
-    {
-      "alias": "collect_data",
-      "type": "task",
-      "taskRef": {
-        "namespace": "com.company.tasks",
-        "name": "data_collector",
-        "version": "1.2.0"
-      },
-      "taskDetail": {
-        // 完整的 TaskDefinition 对象
-      },
-      "inputs": {
-        "source_path": {
-          "expression": "{{pipe.input_path}}",
-          "type": "string"
-        }
-      }
-    }
-  ]
-}
-```
-
-**业务规则**：
-
-- 自动验证所有节点引用的任务是否存在且已发布
-- 如果任务已被删除或版本不再可用，返回错误信息
-- 验证变量绑定的完整性和正确性
-
-**使用场景**：
-
-- 前端页面展示工作流和任务的完整信息
-- 工作流执行前的验证
-- IDE 中的智能提示和错误检查
-
----
-
-## 完整示例
-
-### 示例 1：简单的线性流水线
+## 领域模型结构
 
 ```yaml
 PipelineDefinition:
-  id: "pipeline-001"
-  namespace: "com.example.pipelines"
-  name: "simple_etl"
+  # 唯一标识
+  id: string                           # Pipeline ID，全局唯一
+  namespace: string                    # 命名空间，如 "com.company.pipelines"
+  name: string                         # Pipeline 名称
+  
+  # 版本管理
+  versions: PipelineVersion[]
+    - version: string                  # 版本号："draft" | "1.0.0" | "1.1.0"
+      status: enum                     # "DRAFT" | "PUBLISHED"
+      
+      # Pipeline 输入/输出接口
+      inputVariables: VariableDefinition[]   # Pipeline 的输入参数
+      outputVariables: VariableDefinition[]  # Pipeline 的输出结果
+      
+      # 节点列表（唯一的编排结构）
+      nodes: Node[]                    # 详见 Node.md
+        - id: string                   # 节点 ID
+          name: string                 # 节点名称
+          taskDefinition: TaskDefinitionRef   # 引用的任务定义
+          inputBindings: Map[string, Expression]  # 输入绑定
+          startWhen: Expression        # 何时启动（必填）
+          stopWhen: Expression?        # 何时停止（仅流处理）
+          retryWhen: Expression?       # 何时重试
+          alertWhen: Expression?       # 何时告警
+      
+      # 版本元数据
+      releaseNotes: string             # 发布说明
+      createdAt: Timestamp
+      createdBy: string                # 仅 PUBLISHED 版本有值
+  
+  # Pipeline 元数据
+  metadata:
+    owners: string[]                   # 所有者列表
+    tags: string[]                     # 标签
+    createdAt: Timestamp
+```
+
+## 核心字段说明
+
+### nodes（节点列表）
+
+Pipeline 的**唯一编排结构**，所有执行逻辑都通过 Node 定义。
+
+**关键点**：
+
+- Pipeline 没有单独的 `tasks` 字段，Node 通过 `taskDefinition.ref` 引用 TaskDefinition
+- Node 之间的依赖关系通过 `startWhen` 表达式隐式定义，无需显式的 `dependsOn` 字段
+- 控制流（条件分支、并行、汇聚）都通过 `startWhen` 表达式实现
+
+**示例**：
+
+```yaml
+nodes:
+  # 起始节点：订阅 pipeline.started 事件
+  - id: extract
+    taskDefinition:
+      ref: "com.company:data_extractor:1.0.0"
+    inputBindings:
+      source: "{{ pipeline.input.source_table }}"
+    startWhen: "event:pipeline.started"
+  
+  # 依赖节点：订阅 extract.completed 事件
+  - id: transform
+    taskDefinition:
+      ref: "com.company:data_transformer:1.0.0"
+    inputBindings:
+      input_path: "{{ extract.output_path }}"
+    startWhen: "event:extract.completed"
+  
+  # Join 节点：订阅多个上游事件
+  - id: merge
+    taskDefinition:
+      ref: "com.company:data_merger:1.0.0"
+    inputBindings:
+      path_a: "{{ branch_a.output_path }}"
+      path_b: "{{ branch_b.output_path }}"
+    startWhen: "event:branch_a.completed && event:branch_b.completed"
+  
+  # 条件分支：高质量路径
+  - id: publish_high_quality
+    taskDefinition:
+      ref: "com.company:publisher:1.0.0"
+    inputBindings:
+      data_path: "{{ quality_check.output_path }}"
+    startWhen: "event:quality_check.completed && {{ quality_check.score > 0.9 }}"
+  
+  # 条件分支：低质量需要审批
+  - id: approval
+    taskDefinition:
+      ref: "com.company:approval:1.0.0"
+    inputBindings:
+      reason: "质量评分: {{ quality_check.score }}"
+    startWhen: "event:quality_check.completed && {{ quality_check.score <= 0.9 }}"
+```
+
+### inputVariables / outputVariables
+
+Pipeline 作为整体的输入/输出接口，使得 Pipeline 可以像 TaskDefinition 一样被其他 Pipeline 引用。
+
+**Pipeline 输入示例**：
+
+```yaml
+inputVariables:
+  - name: source_table
+    type: string
+    required: true
+    description: "源表名称"
+  
+  - name: target_date
+    type: string
+    required: true
+    description: "目标日期，格式 YYYY-MM-DD"
+  
+  - name: quality_threshold
+    type: number
+    required: false
+    defaultValue: 0.9
+    description: "质量阈值"
+```
+
+**Pipeline 输出示例**：
+
+```yaml
+outputVariables:
+  - name: output_path
+    type: string
+    description: "处理后的数据路径"
+  
+  - name: row_count
+    type: integer
+    description: "处理的数据行数"
+  
+  - name: quality_score
+    type: number
+    description: "数据质量评分"
+```
+
+### versions（版本管理）
+
+Pipeline 支持版本管理，每个版本有独立的 `nodes`、`inputVariables`、`outputVariables`。
+
+**版本状态**：
+
+- **DRAFT**：草稿版本，可以修改，最多只有一个
+- **PUBLISHED**：已发布版本，不可变，可以有多个
+
+**版本示例**：
+
+```yaml
+versions:
+  - version: "draft"
+    status: "DRAFT"
+    nodes: [...]
+    inputVariables: [...]
+  
+  - version: "1.0.0"
+    status: "PUBLISHED"
+    nodes: [...]
+    releaseNotes: "Initial release"
+    createdAt: "2024-01-01T00:00:00Z"
+    createdBy: "user@company.com"
+  
+  - version: "1.1.0"
+    status: "PUBLISHED"
+    nodes: [...]
+    releaseNotes: "Added quality check"
+    createdAt: "2024-02-01T00:00:00Z"
+    createdBy: "user@company.com"
+```
+
+## 完整示例
+
+### 示例：带质量检查和审批的 ETL Pipeline
+
+```yaml
+PipelineDefinition:
+  id: "pipe_123"
+  namespace: "com.company.pipelines"
+  name: "user_data_etl"
   
   versions:
     - version: "1.0.0"
       status: "PUBLISHED"
       
+      # Pipeline 输入
       inputVariables:
-        - name: "input_path"
-          type: "string"
+        - name: source_table
+          type: string
           required: true
-          description: "输入数据路径"
-        
-        - name: "model_version"
-          type: "string"
+        - name: target_date
+          type: string
           required: true
-          description: "模型版本"
+        - name: quality_threshold
+          type: number
+          defaultValue: 0.9
       
+      # Pipeline 输出
       outputVariables:
-        - name: "output_path"
-          type: "string"
-          required: true
-          description: "处理后的输出路径"
+        - name: output_path
+          type: string
+        - name: row_count
+          type: integer
+        - name: final_quality_score
+          type: number
       
+      # 节点编排
       nodes:
-        # 节点 1: 数据采集
-        - alias: "collect_data"
-          type: "task"
-          dependsOn: []  # 起始节点，无依赖
-          taskRef:
-            namespace: "com.example.tasks"
-            name: "data_collector"
-            version: "1.0.0"
-          inputs:
-            source_path:
-              expression: "{{pipe.input_path}}"
-              type: "string"
-            format:
-              expression: "parquet"
-              type: "string"
-          description: "从源路径采集数据"
+        # 1. 数据提取
+        - id: extract
+          name: "提取源数据"
+          taskDefinition:
+            ref: "com.company:spark_extractor:1.0.0"
+          inputBindings:
+            table_name: "{{ pipeline.input.source_table }}"
+            partition_date: "{{ pipeline.input.target_date }}"
+          startWhen: "event:pipeline.started"
         
-        # 节点 2: 数据处理
-        - alias: "process_data"
-          type: "task"
-          dependsOn: ["collect_data"]  # 依赖数据采集节点
-          taskRef:
-            namespace: "com.example.tasks"
-            name: "data_processor"
-            version: "2.1.0"
-          inputs:
-            input_data:
-              expression: "{{collect_data.output_path}}"
-              type: "string"
-            model_version:
-              expression: "{{pipe.model_version}}"
-              type: "string"
-            batch_size:
-              expression: "1000"
-              type: "number"
-          executionPolicy:
-            maxRetries: 3
-            timeout: 3600
-          description: "使用指定模型处理数据"
+        # 2. 数据转换
+        - id: transform
+          name: "数据转换"
+          taskDefinition:
+            ref: "com.company:spark_transformer:1.0.0"
+          inputBindings:
+            input_path: "{{ extract.output_path }}"
+          startWhen: "event:extract.completed"
+          retryWhen: "{{ attempts < 3 }}"
         
-        # 节点 3: 数据写入
-        - alias: "write_data"
-          type: "task"
-          dependsOn: ["process_data"]  # 依赖数据处理节点
-          taskRef:
-            namespace: "com.example.tasks"
-            name: "data_writer"
-            version: "1.0.0"
-          inputs:
-            data_path:
-              expression: "{{process_data.output_path}}"
-              type: "string"
-            destination:
-              expression: "/output/processed"
-              type: "string"
-
-### 示例 2：带条件判断的流水线
-
-```yaml
-nodes:
-  # 检查数据质量
-  - alias: "check_quality"
-    type: "task"
-    dependsOn: ["collect_data"]
-    taskRef:
-      namespace: "com.example.tasks"
-      name: "quality_checker"
-      version: "1.0.0"
-    inputs:
-      data_path:
-        expression: "{{collect_data.output_path}}"
-        type: "string"
-  
-  # 条件节点：判断数据质量
-  - alias: "quality_gate"
-    type: "condition"
-    dependsOn: ["check_quality"]
-    condition:
-      expression: "{{check_quality.pass_rate >= 0.95}}"
-      variableReferences:
-        - name: "pass_rate"
-          expression: "{{check_quality.pass_rate}}"
-          type: "number"
-    description: "质量阈值检查"
-  
-  # 高质量分支：直接处理
-  - alias: "fast_process"
-    type: "task"
-    dependsOn: ["quality_gate"]  # 条件为 true 时执行
-    taskRef:
-      namespace: "com.example.tasks"
-      name: "fast_processor"
-      version: "1.0.0"
-    inputs:
-      data_path:
-        expression: "{{collect_data.output_path}}"
-  
-  # 低质量分支：清洗后处理
-  - alias: "clean_data"
-    type: "task"
-    dependsOn: ["quality_gate"]  # 条件为 false 时执行
-    taskRef:
-      namespace: "com.example.tasks"
-      name: "data_cleaner"
-      version: "1.0.0"
-    inputs:
-      data_path:
-        expression: "{{collect_data.output_path}}"
+        # 3. 质量检查
+        - id: quality_check
+          name: "质量检查"
+          taskDefinition:
+            ref: "com.company:quality_checker:1.0.0"
+          inputBindings:
+            data_path: "{{ transform.output_path }}"
+            threshold: "{{ pipeline.input.quality_threshold }}"
+          startWhen: "event:transform.completed"
+        
+        # 4a. 高质量路径：直接发布
+        - id: publish_high_quality
+          name: "发布高质量数据"
+          taskDefinition:
+            ref: "com.company:publisher:1.0.0"
+          inputBindings:
+            data_path: "{{ transform.output_path }}"
+          startWhen: "event:quality_check.completed && {{ quality_check.score > 0.9 }}"
+        
+        # 4b. 低质量路径：需要审批
+        - id: approval
+          name: "数据审批"
+          taskDefinition:
+            ref: "com.company:approval:1.0.0"
+          inputBindings:
+            title: "低质量数据发布审批"
+            description: "质量评分: {{ quality_check.score }}"
+            approvers: ["admin@company.com"]
+          startWhen: "event:quality_check.completed && {{ quality_check.score <= 0.9 }}"
+        
+        # 5. 汇聚：两条路径都完成后发送通知
+        - id: notify
+          name: "发送通知"
+          taskDefinition:
+            ref: "com.company:notifier:1.0.0"
+          inputBindings:
+            message: "Pipeline 执行完成"
+          startWhen: "event:publish_high_quality.completed || event:approval.approved"
+      
+      releaseNotes: "Initial release with quality check and approval"
+      createdAt: "2024-01-01T00:00:00Z"
+      createdBy: "user@company.com"
 ```
 
----
+**控制流说明**：
+
+- **顺序执行**：`extract` → `transform` → `quality_check`（通过 `startWhen` 订阅上游 `completed` 事件）
+- **条件分支**：质量检查后根据评分分为两条路径
+  - 高质量路径：`quality_check.score > 0.9` 触发 `publish_high_quality`
+  - 低质量路径：`quality_check.score <= 0.9` 触发 `approval`
+- **汇聚（Join）**：`notify` 订阅两条路径的完成事件，任意一条完成即触发
+
+## 不变式（Invariants）
+
+1. **唯一性约束**
+   - `id` 全局唯一
+   - `namespace + name` 组合全局唯一
+   - 同一 version 内，`nodes[].id` 必须唯一
+
+2. **版本控制约束**
+   - DRAFT 版本最多一个
+   - PUBLISHED 版本不可变
+   - 版本号必须遵循语义化版本规范（如 "1.0.0"）
+
+3. **节点引用有效性**
+   - `node.taskDefinition.ref` 引用的 TaskDefinition 必须存在且已发布
+   - `inputBindings` 中的 key 必须对应 TaskDefinition 的 `inputVariables`
+   - TaskDefinition 的必填输入变量必须在 `inputBindings` 中绑定
+
+4. **事件可达性**
+   - `startWhen` 中引用的事件必须由某个 Node 产生（或由 Pipeline 产生）
+   - Pipeline 必须有至少一个 Node 订阅 `event:pipeline.started`（起始节点）
+
+5. **输出变量一致性**
+   - Pipeline 的 `outputVariables` 必须由某个 Node 的输出提供
+   - 输出变量的绑定通常在 Pipeline 执行结束时计算
+
+## 领域事件
+
+- `PipelineDefinitionCreated`：Pipeline 创建（DRAFT 版本）
+- `PipelineDefinitionModified`：Pipeline 修改（DRAFT 版本）
+- `PipelineDefinitionPublished`：Pipeline 发布（新增 PUBLISHED 版本）
+
+## 命令和查询
+
+### 创建 Pipeline
+
+```
+CreatePipelineDefinition(namespace, name, description, owner) -> PipelineDefinition
+```
+
+创建新的 Pipeline 定义，自动生成 "draft" 版本。
+
+### 修改 Pipeline
+
+```
+ModifyPipelineDefinition(pipelineId, inputVariables?, outputVariables?, nodes?) -> PipelineDefinition
+```
+
+修改 DRAFT 版本的 Pipeline，PUBLISHED 版本不可修改。
+
+### 发布 Pipeline
+
+```
+PublishPipelineDefinition(pipelineId, version, releaseNotes?) -> PipelineVersion
+```
+
+将 DRAFT 版本发布为 PUBLISHED 版本，发布后不可变。
+
+### 查询 Pipeline
+
+```plaintext
+GetPipelineDefinition(namespace, name, version?) -> PipelineDefinition
+ListPipelineVersions(pipelineId) -> PipelineVersion[]
+```
+
+## 与其他领域模型的关系
+
+```plaintext
+┌──────────────────────────────────────────┐
+│ PipelineDefinition                        │
+│                                           │
+│  nodes: Node[]                            │
+│    │                                      │
+│    └──> Node                              │
+│          ├─ taskDefinition ───────────┐   │
+│          │                            │   │
+│          ├─ inputBindings             │   │
+│          │   └─> Expression ───────┐  │   │
+│          │                         │  │   │
+│          ├─ startWhen: Expression   │  │   │
+│          ├─ stopWhen?: Expression   │  │   │
+│          ├─ retryWhen?: Expression  │  │   │
+│          └─ alertWhen?: Expression  │  │   │
+│                                     │  │   │
+└─────────────────────────────────────┼──┼───┘
+                                      │  │
+                ┌─────────────────────┘  │
+                │                        │
+                ▼                        ▼
+      ┌──────────────────┐    ┌──────────────────┐
+      │ TaskDefinition   │    │ Expression       │
+      │                  │    │  - event:...     │
+      │ - inputVariables │    │  - cron:...      │
+      │ - outputVariables│    │  - {{ state }}   │
+      │ - behaviors      │    └──────────────────┘
+      │ - events         │
+      └──────────────────┘
+```
+
+**关键关系**：
+
+- **PipelineDefinition → Node**（组合）：Pipeline 包含多个 Node
+- **Node → TaskDefinition**（引用）：Node 通过 `taskDefinition.ref` 引用可复用的任务模板
+- **Node → Expression**（组合）：Node 通过多种表达式控制执行时机和条件
+- **Expression → Node/TaskDefinition**（引用）：表达式中引用其他 Node 产生的事件或变量

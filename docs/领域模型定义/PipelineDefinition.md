@@ -1,39 +1,39 @@
 
-# PipelineDefinition（流水线定义）
+# **《PipelineDefinition 流水线定义》**
 
 ## 概述
 
-PipelineDefinition 是**编排聚合根**，定义了数据处理流水线的完整结构。它通过一系列 Node（节点）来组织执行流程，每个 Node 引用一个 TaskDefinition 并通过**事件驱动**的方式控制执行顺序和依赖关系。
+**《PipelineDefinition 流水线定义》**是编排聚合根，定义了数据处理流水线的完整结构。它通过一系列 **《Node 节点》**来组织执行流程，每个 **《Node 节点》**引用一个 **《TaskDefinition 任务定义》**并通过事件驱动的方式控制执行顺序和依赖关系。
 
 **核心特点**：
 
-- **事件驱动编排**：Node 之间不使用显式的 ConditionNode、JoinNode、ForkNode，而是通过 `startWhen` 表达式订阅事件来实现控制流
-- **可复用的任务模板**：Node 引用 TaskDefinition，TaskDefinition 可跨 Pipeline 复用
+- **事件驱动编排**：**《Node 节点》**之间不使用显式的 ConditionNode、JoinNode、ForkNode，而是通过 `startWhen` **《Expression 表达式》**订阅 **《Event 事件》**来实现控制流
+- **可复用的任务模板**：**《Node 节点》**引用 **《TaskDefinition 任务定义》**，**《TaskDefinition 任务定义》**可跨 **《Pipeline 流水线》**复用
 - **版本管理**：支持 DRAFT 和 PUBLISHED 状态的版本控制
-- **输入/输出定义**：Pipeline 可作为"黑盒"被其他 Pipeline 引用（类似于 TaskDefinition）
+- **输入/输出定义**：**《Pipeline 流水线》**可作为"黑盒"被其他 **《Pipeline 流水线》**引用（类似于 **《TaskDefinition 任务定义》**）
 
 ## 核心职责
 
-1. **定义节点列表**：Pipeline 由一组 Node 组成，每个 Node 引用一个 TaskDefinition
-2. **事件驱动编排**：Node 通过 `startWhen` 表达式订阅上游事件，实现依赖控制
-3. **输入/输出接口**：定义 Pipeline 级别的输入和输出变量，支持嵌套复用
+1. **定义节点列表**：**《Pipeline 流水线》**由一组 **《Node 节点》**组成，每个 **《Node 节点》**引用一个 **《TaskDefinition 任务定义》**
+2. **事件驱动编排**：**《Node 节点》**通过 `startWhen` **《Expression 表达式》**订阅上游 **《Event 事件》**，实现依赖控制
+3. **输入/输出接口**：定义 **《Pipeline 流水线》**级别的输入和输出变量，支持嵌套复用
 4. **版本管理**：维护 DRAFT 和 PUBLISHED 版本，确保已发布版本不可变
 
 ## 设计原则
 
-1. **扁平化结构**：Pipeline 只有 `nodes[]` 数组，没有单独的 `tasks` 数组
-2. **事件订阅模式**：依赖关系通过 `startWhen` 事件表达式隐式定义，而非显式的 `dependsOn` 字段
-3. **无显式控制节点**：不需要 ConditionNode、JoinNode、ForkNode，所有控制流通过表达式实现
-4. **任务复用**：TaskDefinition 独立于 Pipeline 存在，可被多个 Pipeline 引用
+1. **扁平化结构**：**《Pipeline 流水线》**只有 `nodes[]` 数组，没有单独的 `tasks` 数组
+2. **事件订阅模式**：依赖关系通过 `startWhen` **《Event 事件》** **《Expression 表达式》**隐式定义，而非显式的 `dependsOn` 字段
+3. **无显式控制节点**：不需要 ConditionNode、JoinNode、ForkNode，所有控制流通过 **《Expression 表达式》**实现
+4. **任务复用**：**《TaskDefinition 任务定义》**独立于 **《Pipeline 流水线》**存在，可被多个 **《Pipeline 流水线》**引用
 
-## Pipeline 与 Node 的关系
+## **《Pipeline 流水线》**与 **《Node 节点》**的关系
 
-| 维度 | PipelineDefinition | Node |
+| 维度 | **《PipelineDefinition 流水线定义》** | **《Node 节点》** |
 |------|-------------------|------|
 | 定义 | 编排的整体结构 | 编排中的单个执行单元 |
 | 职责 | 定义"有哪些节点" | 定义"何时执行、如何执行" |
-| 复用性 | 可作为整体被其他 Pipeline 引用 | 引用可复用的 TaskDefinition |
-| 控制流 | 通过 nodes 数组组织 | 通过 startWhen 订阅上游事件 |
+| 复用性 | 可作为整体被其他 **《Pipeline 流水线》**引用 | 引用可复用的 **《TaskDefinition 任务定义》** |
+| 控制流 | 通过 nodes 数组组织 | 通过 startWhen 订阅上游 **《Event 事件》** |
 
 ## 领域模型结构
 

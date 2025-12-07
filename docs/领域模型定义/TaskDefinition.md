@@ -1,8 +1,8 @@
-# TaskDefinition（任务定义）
+# **《TaskDefinition 任务定义》**
 
 ## 概述
 
-TaskDefinition 是**可复用的任务模板**，定义了一类任务"能做什么"、"需要什么输入"、"产生什么输出"。它是独立于 Pipeline 的领域概念，可以被多个 Pipeline 的多个 Node 引用。
+**《TaskDefinition 任务定义》**是可复用的任务模板，定义了一类任务"能做什么"、"需要什么输入"、"产生什么输出"。它是独立于 **《Pipeline 流水线》**的领域概念，可以被多个 **《Pipeline 流水线》**的多个 **《Node 节点》**引用。
 
 ### 核心职责
 
@@ -14,16 +14,16 @@ TaskDefinition 是**可复用的任务模板**，定义了一类任务"能做什
 
 ### 设计原则
 
-**TaskDefinition 只关心"是什么"，不关心"何时执行"**：
+**《TaskDefinition 任务定义》只关心"是什么"，不关心"何时执行"**：
 
 - ✅ 定义：任务类型、输入输出、执行逻辑
-- ✅ 定义：任务支持哪些行为（actions）
-- ✅ 定义：任务产生哪些事件（events）
+- ✅ 定义：任务支持哪些 **《Action 行为》**
+- ✅ 定义：任务产生哪些 **《Event 事件》**
 - ❌ 不定义：何时启动（startWhen）
 - ❌ 不定义：何时重试（retryWhen）
 - ❌ 不定义：依赖关系
 
-**编排逻辑由 Node 控制**：具体的执行时机、依赖关系、重试策略等编排逻辑在 Pipeline 的 Node 中通过表达式（startWhen、stopWhen 等）定义。
+**编排逻辑由 《Node 节点》控制**：具体的执行时机、依赖关系、重试策略等编排逻辑在 **《Pipeline 流水线》**的 **《Node 节点》**中通过 **《Expression 表达式》**（startWhen、stopWhen 等）定义。
 
 ## 领域模型结构
 
@@ -193,17 +193,17 @@ pipeline:
     - id: data_processing
       taskDefinition: spark_etl_v1
       startWhen: "event:pipeline.started"
-    
+  
     - id: quality_check
       taskDefinition: quality_validator_v1
       # 等待上游完成事件 + 检查输出变量
       startWhen: "event:data_processing.completed && {{ data_processing.quality_score > 0.9 }}"
-    
+  
     - id: manual_review
       taskDefinition: approval_task_v1
       # 质量不达标时需要人工审批
       startWhen: "event:data_processing.completed && {{ data_processing.quality_score <= 0.9 }}"
-    
+  
     - id: deploy
       taskDefinition: deploy_task_v1
       # 两条路径：质量达标或审批通过
@@ -522,6 +522,5 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?limit=100&o
 **业务规则**：
 
 - 返回的版本按时间降序排列（最新的在前）
-
 
 ---

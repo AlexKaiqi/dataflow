@@ -1,22 +1,22 @@
-# Node（节点）
+# **《Node 节点》**
 
 ## 概述
 
-Node 是 Pipeline 中的**编排单元**，代表工作流中的一个执行点。Node 通过引用 TaskDefinition 并配置执行控制逻辑，将可复用的任务模板实例化到具体的业务流程中。
+**《Node 节点》**是 **《Pipeline 流水线》**中的编排单元，代表工作流中的一个执行点。**《Node 节点》**通过引用 **《TaskDefinition 任务定义》**并配置执行控制逻辑，将可复用的任务模板实例化到具体的业务流程中。
 
 ### 核心职责
 
-- **引用任务定义**：通过 TaskDefinition 引用声明"要做什么"
-- **绑定输入变量**：指定任务输入从哪里来（上游输出、Pipeline 输入、常量）
-- **控制执行时机**：通过表达式（startWhen、stopWhen 等）定义"何时执行"
-- **定义依赖关系**：通过事件订阅隐式定义与其他 Node 的依赖关系
+- **引用任务定义**：通过 **《TaskDefinition 任务定义》**引用声明"要做什么"
+- **绑定输入变量**：指定任务输入从哪里来（上游输出、**《Pipeline 流水线》**输入、常量）
+- **控制执行时机**：通过 **《Expression 表达式》**（startWhen、stopWhen 等）定义"何时执行"
+- **定义依赖关系**：通过 **《Event 事件》**订阅隐式定义与其他 **《Node 节点》**的依赖关系
 
 ### 设计原则
 
-**Node 是 TaskDefinition 的实例化**：
+**《Node 节点》是 《TaskDefinition 任务定义》的实例化**：
 
-- **TaskDefinition**：定义"能做什么"（可复用的任务模板）
-- **Node**：定义"何时做、如何做"（任务在 Pipeline 中的实例化配置）
+- **《TaskDefinition 任务定义》**：定义"能做什么"（可复用的任务模板）
+- **《Node 节点》**：定义"何时做、如何做"（任务在 **《Pipeline 流水线》**中的实例化配置）
 
 **类比**：
 
@@ -34,17 +34,17 @@ Node = 函数调用 + 调用条件
       )
 ```
 
-## Node 与 TaskDefinition 的关系
+## **《Node 节点》**与 **《TaskDefinition 任务定义》**的关系
 
-| 维度 | TaskDefinition | Node |
+| 维度 | **《TaskDefinition 任务定义》** | **《Node 节点》** |
 |------|---------------|------|
-| **定义** | 可复用的任务模板 | 任务在 Pipeline 中的实例 |
-| **位置** | 独立存在，可跨 Pipeline 复用 | 存在于 PipelineDefinition.nodes 中 |
+| **定义** | 可复用的任务模板 | 任务在 **《Pipeline 流水线》**中的实例 |
+| **位置** | 独立存在，可跨 **《Pipeline 流水线》**复用 | 存在于 **《PipelineDefinition 流水线定义》**.nodes 中 |
 | **职责** | "能做什么"：定义行为、输入输出 | "何时做、如何做"：控制执行时机 |
-| **变量** | 声明需要什么输入（inputVariables） | 绑定输入从哪里来（inputBindings） |
-| **事件** | 定义产生什么事件（outputEvents） | 订阅哪些事件（startWhen 中引用） |
-| **复用性** | 可被多个 Pipeline 的多个 Node 引用 | 仅属于特定 Pipeline |
-| **修改影响** | 影响所有引用该定义的 Node | 仅影响当前 Pipeline |
+| **变量** | 声明需要什么输入（**《VariableDefinition 变量定义》**） | 绑定输入从哪里来（inputBindings） |
+| **事件** | 定义产生什么 **《Event 事件》**（outputEvents） | 订阅哪些 **《Event 事件》**（startWhen 中引用） |
+| **复用性** | 可被多个 **《Pipeline 流水线》**的多个 **《Node 节点》**引用 | 仅属于特定 **《Pipeline 流水线》** |
+| **修改影响** | 影响所有引用该定义的 **《Node 节点》** | 仅影响当前 **《Pipeline 流水线》** |
 
 ## 领域模型结构
 

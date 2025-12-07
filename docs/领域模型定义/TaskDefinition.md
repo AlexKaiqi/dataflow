@@ -208,42 +208,6 @@ pipeline:
       startWhen: "event:quality_check.completed || event:manual_review.approved"
 ```
 
-### 任务定义的复用
-
-任务定义可以被多个流水线的多个节点引用：
-
-```yaml
-# TaskDefinition（全局定义）
-taskDefinition:
-  namespace: com.company
-  name: quality_approval
-  version: "1.0.0"
-  type: approval
-  inputVariables:
-    - name: data_summary
-      type: object
-  outputVariables:
-    - name: approver
-      type: string
-    - name: approval_time
-      type: timestamp
-
-# Pipeline 1
-pipeline:
-  name: pipeline_a
-  nodes:
-    - id: review_step_1
-      taskDefinition: com.company:quality_approval:1.0.0
-      startWhen: "event:transform.completed"
-
-# Pipeline 2
-pipeline:
-  name: pipeline_b
-  nodes:
-    - id: final_review
-      taskDefinition: com.company:quality_approval:1.0.0  # 复用同一个定义
-      startWhen: "event:last_step.completed"
-```
 
 ## 不变式
 
@@ -254,11 +218,130 @@ pipeline:
 
 ## 领域事件
 
-- `TaskDefinitionCreated` - 任务定义已创建（草稿版本）
-- `TaskDefinitionModified` - 任务定义已修改（草稿版本）
-- `TaskDefinitionPublished` - 任务定义已发布（新增已发布版本）
+### TaskDefinitionCreated
 
-**TODO**：补充事件的消息体结构（EventPayload）定义
+任务定义已创建（草稿版本）。
+
+**消息体结构**：
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "TaskDefinitionCreated",
+  "timestamp": "2025-01-15T10:00:00Z",
+  "aggregateId": "com.company.tasks:data_cleaner",
+  "version": 1,
+  "payload": {
+    "namespace": "com.company.tasks",
+    "name": "data_cleaner",
+    "version": "draft",
+    "type": "ray_operator",
+    "status": "DRAFT",
+    "createdBy": "alice",
+    "createdAt": "2025-01-15T10:00:00Z",
+    "metadata": {
+      "description": "数据清洗任务"
+    }
+  }
+}
+```
+
+### TaskDefinitionModified
+
+任务定义已修改（草稿版本）。
+
+**消息体结构**：
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "TaskDefinitionModified",
+  "timestamp": "2025-01-15T11:00:00Z",
+  "aggregateId": "com.company.tasks:data_cleaner",
+  "version": 2,
+  "payload": {
+    "namespace": "com.company.tasks",
+    "name": "data_cleaner",
+    "version": "draft",
+    "modifiedBy": "alice",
+    "modifiedAt": "2025-01-15T11:00:00Z",
+    "changes": {
+      "inputVariables": {
+        "added": [
+          {
+            "name": "batch_size",
+            "type": "integer",
+            "required": false,
+            "default": 1000
+          }
+        ],
+        "removed": [],
+        "modified": []
+      },
+      "outputVariables": {
+        "added": [],
+        "removed": [],
+        "modified": []
+      },
+      "executionConfig": {
+        "changed": true,
+        "diff": "..."
+      },
+      "metadata": {
+        "description": "更新描述"
+      }
+    }
+  }
+}
+```
+
+### TaskDefinitionPublished
+
+任务定义已发布（新增已发布版本）。
+
+**消息体结构**：
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "TaskDefinitionPublished",
+  "timestamp": "2025-01-15T12:00:00Z",
+  "aggregateId": "com.company.tasks:data_cleaner",
+  "version": 3,
+  "payload": {
+    "namespace": "com.company.tasks",
+    "name": "data_cleaner",
+    "version": "1.0.0",
+    "status": "PUBLISHED",
+    "publishedBy": "alice",
+    "publishedAt": "2025-01-15T12:00:00Z",
+    "releaseNotes": "Initial release with data cleaning operators",
+    "snapshot": {
+      "type": "ray_operator",
+      "inputVariables": [...],
+      "outputVariables": [...],
+      "executionConfig": {...},
+      "metadata": {...}
+    }
+  }
+}
+```
+
+**事件消息体通用字段说明**：
+
+- `eventId`: 事件唯一标识符（UUID）
+- `eventType`: 事件类型名称
+- `timestamp`: 事件发生时间（ISO 8601 格式）
+- `aggregateId`: 聚合根标识符（格式：`namespace:name`）
+- `version`: 事件版本号（单调递增，用于事件溯源）
+- `payload`: 事件负载，包含具体的业务数据
+
+**使用场景**：
+
+1. **事件溯源（Event Sourcing）**：通过重放事件序列重建任务定义的完整历史状态
+2. **审计日志**：记录任务定义的所有变更历史，包括创建者、修改者和时间戳
+3. **变更通知**：下游系统订阅这些事件以响应任务定义的变化（如缓存失效、重新部署等）
+4. **数据同步**：将任务定义变更同步到其他系统或数据仓库
 
 ## 命令
 

@@ -218,6 +218,15 @@ pipeline:
 
 ## 领域事件
 
+### 事件设计原则
+
+领域事件遵循**轻量化设计**原则：
+
+- 只包含**最小必要信息**：标识发生了什么变化
+- 包含**关键标识符**：让订阅者能通过 API 查询完整数据
+- **避免重复定义**：不在事件中复制聚合根的完整结构
+- 订阅者需要完整数据时，通过 `GET /api/v1/task-definitions/{namespace:name:version}` 查询
+
 ### TaskDefinitionCreated
 
 任务定义已创建（草稿版本）。
@@ -226,7 +235,7 @@ pipeline:
 
 ```json
 {
-  "eventId": "uuid",
+  "eventId": "550e8400-e29b-41d4-a716-446655440000",
   "eventType": "TaskDefinitionCreated",
   "timestamp": "2025-01-15T10:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
@@ -236,15 +245,16 @@ pipeline:
     "name": "data_cleaner",
     "version": "draft",
     "type": "ray_operator",
-    "status": "DRAFT",
-    "createdBy": "alice",
-    "createdAt": "2025-01-15T10:00:00Z",
-    "metadata": {
-      "description": "数据清洗任务"
-    }
+    "createdBy": "alice"
   }
 }
 ```
+
+**Payload 字段说明**：
+
+- `namespace`, `name`, `version`: 任务定义标识符
+- `type`: 任务类型（用于快速判断任务类别）
+- `createdBy`: 创建者（用于审计）
 
 ### TaskDefinitionModified
 
@@ -254,7 +264,7 @@ pipeline:
 
 ```json
 {
-  "eventId": "uuid",
+  "eventId": "550e8400-e29b-41d4-a716-446655440001",
   "eventType": "TaskDefinitionModified",
   "timestamp": "2025-01-15T11:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
@@ -264,36 +274,22 @@ pipeline:
     "name": "data_cleaner",
     "version": "draft",
     "modifiedBy": "alice",
-    "modifiedAt": "2025-01-15T11:00:00Z",
-    "changes": {
-      "inputVariables": {
-        "added": [
-          {
-            "name": "batch_size",
-            "type": "integer",
-            "required": false,
-            "default": 1000
-          }
-        ],
-        "removed": [],
-        "modified": []
-      },
-      "outputVariables": {
-        "added": [],
-        "removed": [],
-        "modified": []
-      },
-      "executionConfig": {
-        "changed": true,
-        "diff": "..."
-      },
-      "metadata": {
-        "description": "更新描述"
-      }
+    "changesSummary": {
+      "inputVariablesChanged": true,
+      "outputVariablesChanged": false,
+      "executionConfigChanged": true,
+      "metadataChanged": true
     }
   }
 }
 ```
+
+**Payload 字段说明**：
+
+- `modifiedBy`: 修改者（用于审计）
+- `changesSummary`: 变更摘要（布尔值标识哪些部分发生了变化）
+  - 订阅者根据此摘要决定是否需要查询完整数据
+  - 不包含具体变更内容，避免与聚合根模型重复定义
 
 ### TaskDefinitionPublished
 
@@ -303,7 +299,7 @@ pipeline:
 
 ```json
 {
-  "eventId": "uuid",
+  "eventId": "550e8400-e29b-41d4-a716-446655440002",
   "eventType": "TaskDefinitionPublished",
   "timestamp": "2025-01-15T12:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
@@ -311,37 +307,74 @@ pipeline:
   "payload": {
     "namespace": "com.company.tasks",
     "name": "data_cleaner",
-    "version": "1.0.0",
-    "status": "PUBLISHED",
+    "fromVersion": "draft",
+    "toVersion": "1.0.0",
     "publishedBy": "alice",
-    "publishedAt": "2025-01-15T12:00:00Z",
-    "releaseNotes": "Initial release with data cleaning operators",
-    "snapshot": {
-      "type": "ray_operator",
-      "inputVariables": [...],
-      "outputVariables": [...],
-      "executionConfig": {...},
-      "metadata": {...}
-    }
+    "releaseNotes": "Initial release with data cleaning operators"
   }
 }
 ```
 
-**事件消息体通用字段说明**：
+**Payload 字段说明**：
 
-- `eventId`: 事件唯一标识符（UUID）
-- `eventType`: 事件类型名称
-- `timestamp`: 事件发生时间（ISO 8601 格式）
-- `aggregateId`: 聚合根标识符（格式：`namespace:name`）
-- `version`: 事件版本号（单调递增，用于事件溯源）
-- `payload`: 事件负载，包含具体的业务数据
+- `fromVersion`: 发布前的版本（通常是 "draft"）
+- `toVersion`: 发布后的新版本号
+- `publishedBy`: 发布者（用于审计）
+- `releaseNotes`: 发布说明（用于版本追踪）
 
-**使用场景**：
+---
 
-1. **事件溯源（Event Sourcing）**：通过重放事件序列重建任务定义的完整历史状态
-2. **审计日志**：记录任务定义的所有变更历史，包括创建者、修改者和时间戳
-3. **变更通知**：下游系统订阅这些事件以响应任务定义的变化（如缓存失效、重新部署等）
-4. **数据同步**：将任务定义变更同步到其他系统或数据仓库
+### 事件消息体通用结构
+
+所有领域事件都遵循统一的消息结构：
+
+```json
+{
+  "eventId": "uuid",           // 事件唯一标识符
+  "eventType": "string",       // 事件类型名称
+  "timestamp": "ISO8601",      // 事件发生时间
+  "aggregateId": "string",     // 聚合根标识符 (namespace:name)
+  "version": "integer",        // 事件序列号（单调递增）
+  "payload": {                 // 事件负载（轻量化设计）
+    // 最小必要信息
+  }
+}
+```
+
+**字段说明**：
+
+- `eventId`: 事件的全局唯一标识符（UUID 格式）
+- `eventType`: 事件类型，用于路由和处理
+- `timestamp`: 事件发生的时间戳（ISO 8601 格式）
+- `aggregateId`: 聚合根标识符（格式：`namespace:name`，不包含版本号）
+- `version`: 该聚合根的事件序列号（从 1 开始递增，用于事件溯源和顺序保证）
+- `payload`: 轻量化的事件负载，只包含关键标识和变更摘要
+
+### 使用场景
+
+1. **变更通知**：下游系统订阅事件以响应变化（如缓存失效、触发 CI/CD）
+2. **审计日志**：记录所有变更的时间、操作者和变更摘要
+3. **事件溯源**：通过 `aggregateId` 和 `version` 查询聚合根的完整事件历史
+4. **最终一致性**：异步传播变更到读模型或其他系统
+
+### 查询完整数据
+
+事件订阅者如需获取完整的任务定义数据，应通过以下 API 查询：
+
+```bash
+# 查询特定版本
+GET /api/v1/task-definitions/{namespace:name:version}
+
+# 示例
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft
+```
+
+这样可以：
+
+- **避免数据冗余**：事件中不重复存储完整的任务定义结构
+- **获取最新状态**：查询 API 总是返回最新的数据，避免使用事件中的过时快照
+- **降低耦合度**：事件结构与聚合根模型独立演进
 
 ## 命令
 

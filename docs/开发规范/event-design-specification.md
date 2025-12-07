@@ -2,7 +2,7 @@
 
 ## 概述
 
-本规范定义了系统中所有领域事件的设计原则、消息结构和使用场景。遵循本规范可以确保事件的一致性、可追溯性和可维护性。
+本规范定义了系统中所有领域事件的设计原则、消息结构和使用场景。本规范用于**领域建模阶段**，指导事件的设计和文档编写，确保事件的一致性、可追溯性和可维护性。
 
 ## 设计原则
 
@@ -40,25 +40,13 @@ Event = Command Input + Execution Context
    (意图)                (处理)           (事实记录)
 ```
 
-**示例**：
+**示例对比**：
 
-```yaml
-# Command (执行前)
-PATCH /task-definitions/com.company.tasks:data_cleaner/draft
-{
-  "inputVariables": [...],  # 用户的修改意图
-  "modifiedBy": "bob"
-}
-
-# Event (执行后)
-TaskDefinitionModified {
-  "version": "draft-20250115140000",  # ✅ 执行后生成
-  "previousVersion": "draft-20250115130000",  # ✅ 执行后确定
-  "timestamp": "2025-01-15T14:00:00Z",  # ✅ 执行时间
-  "eventId": "uuid",  # ✅ 事件ID
-  "modifiedBy": "bob"  # ← 来自 Command
-}
-```
+| 来源 | 字段 | 说明 |
+|------|------|------|
+| **Command Input** | `modifiedBy`, `inputVariables` | 用户提供的修改内容 |
+| **Execution Context** | `version`, `previousVersion` | 执行时确定的版本信息 |
+| **Execution Context** | `timestamp`, `eventId` | 系统生成的时间和ID |
 
 ## 事件消息体通用结构
 
@@ -144,93 +132,41 @@ TaskDefinitionModified {
 
 下游系统订阅事件以响应变化：
 
-```python
-# 订阅 TaskDefinitionModified 事件
-@event_handler("TaskDefinitionModified")
-def on_task_definition_modified(event):
-    # 使缓存失效
-    cache.invalidate(event.aggregateId)
-    
-    # 触发 CI/CD
-    if event.payload.get("type") == "ray_operator":
-        ci_cd.trigger_build(event.aggregateId)
-```
+- **缓存失效**：收到事件后使相关缓存失效
+- **触发 CI/CD**：任务定义发布后触发构建流程
+- **通知用户**：通过 WebSocket 推送变更通知
 
 ### 2. 审计日志
 
 记录所有变更的时间、操作者和版本信息：
 
-```python
-# 审计日志表
-audit_log = {
-    "event_id": event.eventId,
-    "event_type": event.eventType,
-    "aggregate_id": event.aggregateId,
-    "timestamp": event.timestamp,
-    "operator": event.payload.get("modifiedBy"),
-    "version": event.payload.get("version")
-}
-```
+- 谁（`modifiedBy`）在什么时间（`timestamp`）
+- 对什么资源（`aggregateId`）做了什么操作（`eventType`）
+- 产生了什么版本（`payload.version`）
 
 ### 3. 事件溯源
 
 通过 `aggregateId` 和 `version` 查询聚合根的完整事件历史：
 
-```python
-# 查询某个任务定义的所有事件
-events = event_store.query(
-    aggregate_id="com.company.tasks:data_cleaner",
-    order_by="version ASC"
-)
-
-# 重建聚合根状态（如果需要）
-state = {}
-for event in events:
-    state = apply_event(state, event)
-```
+- 按版本顺序查询所有事件
+- 了解资源的完整演变过程
+- 支持时间旅行调试
 
 ### 4. 最终一致性
 
 异步传播变更到读模型或其他系统：
 
-```python
-# 更新读模型
-@event_handler("TaskDefinitionPublished")
-def update_read_model(event):
-    # 从 API 查询完整定义
-    definition = api.get_task_definition(
-        event.aggregateId,
-        event.payload["toVersion"]
-    )
-    
-    # 更新 Elasticsearch 索引
-    search_index.update(definition)
-```
+- **搜索索引**：更新 Elasticsearch 等搜索引擎
+- **数据仓库**：同步数据到分析系统
+- **第三方系统**：通过 Webhook 通知外部系统
 
 ### 5. 版本追溯
 
 通过事件中的版本号可以查询任何时刻的完整状态：
 
-```python
-# 从事件中获取版本号
-@event_handler("TaskDefinitionModified")
-def track_version_change(event):
-    new_version = event.payload["version"]
-    old_version = event.payload["previousVersion"]
-    
-    # 查询完整状态
-    new_state = api.get_task_definition(
-        event.aggregateId,
-        new_version
-    )
-    old_state = api.get_task_definition(
-        event.aggregateId,
-        old_version
-    )
-    
-    # 生成变更报告
-    diff = generate_diff(old_state, new_state)
-```
+- 从事件获取版本号
+- 通过 API 查询特定版本的完整内容
+- 对比不同版本生成变更报告
 
 ## 查询完整数据
 
@@ -256,43 +192,21 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 - **降低耦合度**：事件结构与聚合根模型独立演进
 - **简化事件处理**：订阅者只需处理轻量级通知
 
-## 事件发布机制
+## 事件发布原则
 
 ### 发布时机
 
 事件应在业务操作**成功完成后**立即发布：
 
-```python
-# ✅ 正确：先持久化，再发布事件
-def modify_task_definition(aggregate_id, changes):
-    # 1. 执行业务逻辑
-    new_version = create_new_draft_version(aggregate_id, changes)
-    
-    # 2. 持久化到数据库
-    repository.save(new_version)
-    
-    # 3. 发布事件（在事务提交后）
-    event = TaskDefinitionModified(
-        eventId=generate_uuid(),
-        aggregateId=aggregate_id,
-        version=get_next_event_version(aggregate_id),
-        timestamp=now(),
-        payload={
-            "version": new_version.version,
-            "previousVersion": new_version.previous_version,
-            "modifiedBy": changes.modified_by
-        }
-    )
-    event_bus.publish(event)
-    
-    return new_version
-```
+1. 执行业务逻辑
+2. 持久化状态变更
+3. 发布领域事件
 
 ### 发布保证
 
 - **至少一次（At-least-once）**：事件可能被重复发送，订阅者需要实现幂等性
 - **顺序保证**：同一聚合根的事件按 `version` 顺序发布
-- **异步发布**：不阻塞业务操作，但需要确保事务成功后才发布
+- **异步发布**：不阻塞业务操作
 
 ## 事件命名规范
 
@@ -374,72 +288,26 @@ def modify_task_definition(aggregate_id, changes):
 - **缺失字段**：为缺失的可选字段提供默认值
 - **类型检查**：验证字段类型，优雅处理类型错误
 
-```python
-def handle_event(event):
-    # 安全地获取字段，提供默认值
-    version = event.payload.get("version")
-    previous_version = event.payload.get("previousVersion", None)
-    reason = event.payload.get("reason", "No reason provided")
-    
-    # 验证必填字段
-    if not version:
-        logger.error(f"Missing required field: version in event {event.eventId}")
-        return
-    
-    # 处理业务逻辑
-    process_modification(version, previous_version, reason)
-```
+## 事件文档要求
 
-## 测试指南
+在领域模型文档中定义事件时，应包含以下内容：
 
-### 事件发布测试
+### 必需内容
 
-```python
-def test_task_definition_modified_event():
-    # Given
-    task_def = create_task_definition("com.company.tasks:test_task")
-    
-    # When
-    modified_task = modify_task_definition(
-        task_def.aggregate_id,
-        changes={"inputVariables": [...]}
-    )
-    
-    # Then - 验证事件已发布
-    events = event_bus.get_published_events()
-    assert len(events) == 1
-    
-    event = events[0]
-    assert event.eventType == "TaskDefinitionModified"
-    assert event.aggregateId == "com.company.tasks:test_task"
-    assert event.payload["version"] == modified_task.version
-    assert event.payload["modifiedBy"] == "test_user"
-```
+1. **事件名称**：遵循命名规范的事件类型名称
+2. **事件说明**：简要描述事件表示什么业务事实
+3. **消息体结构**：完整的 JSON 示例
+4. **Payload 字段说明**：每个字段的含义和用途
 
-### 事件消费测试
+### 可选内容
 
-```python
-def test_event_handler():
-    # Given
-    event = TaskDefinitionModified(
-        eventId="test-uuid",
-        aggregateId="com.company.tasks:test_task",
-        version=2,
-        timestamp="2025-01-15T14:00:00Z",
-        payload={
-            "version": "draft-20250115140000",
-            "previousVersion": "draft-20250115130000",
-            "modifiedBy": "bob"
-        }
-    )
-    
-    # When
-    handle_event(event)
-    
-    # Then - 验证副作用
-    assert cache.is_invalidated("com.company.tasks:test_task")
-    assert ci_cd.is_triggered("com.company.tasks:test_task")
-```
+- **触发条件**：什么操作会产生此事件
+- **业务规则**：事件发布的前置条件
+- **相关事件**：与此事件相关的其他事件
+
+### 示例
+
+参考 [TaskDefinition 领域模型](../领域模型定义/TaskDefinition.md) 中的事件定义部分。
 
 ## 参考文档
 

@@ -32,7 +32,7 @@ TaskDefinition:
   # 唯一标识
   namespace: string              # 命名空间，如 "com.company.tasks"
   name: string                   # 任务名称，如 "data_transform"
-  version: string                # 版本号，如 "1.0.0"
+  version: string                # 版本号（见版本管理说明）
   # 复合键 namespace:name:version 全局唯一
   
   # 基本信息
@@ -53,7 +53,43 @@ TaskDefinition:
   # 元数据
   createdAt: timestamp
   createdBy: string
-  status: "DRAFT" | "PUBLISHED"
+  lastModifiedAt: timestamp       # 最后修改时间
+  lastModifiedBy: string          # 最后修改者
+  status: "DRAFT" | "PUBLISHED"   # 版本状态
+```
+
+### 版本管理
+
+TaskDefinition 支持多版本管理：
+
+**草稿版本（Draft Versions）**：
+- 格式：`draft-YYYYMMDDHHmmss`（如 `draft-20250115140000`）
+- 状态：`DRAFT`
+- 特点：
+  - 可修改
+  - 不可被流水线引用
+  - 每次修改创建新的草稿版本（追加式）
+  - 保留完整的修改历史
+
+**已发布版本（Published Versions）**：
+
+- 格式：语义化版本 `major.minor.patch`（如 `1.0.0`）
+- 状态：`PUBLISHED`
+- 特点：
+  - 不可修改（immutable）
+  - 可被流水线引用
+  - 遵循语义化版本规范
+
+**版本演进示例**：
+
+```yaml
+versions:
+  - version: "draft-20250115140000"  # 最新草稿
+    status: "DRAFT"
+  - version: "draft-20250115130000"  # 历史草稿
+    status: "DRAFT"
+  - version: "1.0.0"                 # 已发布版本
+    status: "PUBLISHED"
 ```
 
 ## **《TaskType 任务类型》**
@@ -212,8 +248,9 @@ pipeline:
 ## 不变式
 
 - **复合键全局唯一**：`namespace:name:version` 三元组在系统中全局唯一。
-- **草稿版本唯一性**：每个 `namespace:name` 组合最多只有一个草稿版本（`version=draft`）。
-- **已发布版本不可变**：状态为已发布的任务定义完全不可修改。
+- **草稿版本追加式创建**：每次修改创建新的 `draft-{timestamp}` 版本，不覆盖历史草稿。
+- **已发布版本不可变**：状态为 `PUBLISHED` 的任务定义完全不可修改。
+- **版本号递增**：已发布版本号必须大于该任务的所有已发布版本。
 - **引用约束**：已被任何流水线引用的已发布版本不允许删除。
 
 ## 领域事件
@@ -222,14 +259,36 @@ pipeline:
 
 领域事件遵循**轻量化设计**原则：
 
-- 只包含**最小必要信息**：标识发生了什么变化
-- 包含**关键标识符**：让订阅者能通过 API 查询完整数据
-- **避免重复定义**：不在事件中复制聚合根的完整结构
+- **最小必要信息**：只包含标识变化的关键信息
+- **引用标识符**：包含 `namespace`、`name`、`version` 让订阅者能查询完整数据
+- **避免数据冗余**：不在事件中复制完整的任务定义结构
+- **可追溯性**：通过版本号可以查询到任何时刻的完整状态
 - 订阅者需要完整数据时，通过 `GET /api/v1/task-definitions/{namespace:name:version}` 查询
+
+### Command vs Event
+
+**Command（命令）** 表达"修改意图"：
+
+- 用户通过 API 发送的请求体
+- 包含要修改的字段和值
+- 在执行前发送
+
+**Event（事件）** 记录"已发生的事实"：
+
+- Command 执行后生成
+- 包含执行上下文（如新版本号、时间戳、事件ID）
+- 不包含完整状态快照（通过版本号查询）
+
+**关系**：`Event = Command Input + Execution Context`
+
+```text
+用户发送 Command    →    系统执行    →    生成 Event
+   (意图)                (处理)           (事实记录)
+```
 
 ### TaskDefinitionCreated
 
-任务定义已创建（草稿版本）。
+任务定义已创建（初始草稿版本）。
 
 **消息体结构**：
 
@@ -243,7 +302,7 @@ pipeline:
   "payload": {
     "namespace": "com.company.tasks",
     "name": "data_cleaner",
-    "version": "draft",
+    "version": "draft-20250115100000",
     "type": "ray_operator",
     "createdBy": "alice"
   }
@@ -252,13 +311,14 @@ pipeline:
 
 **Payload 字段说明**：
 
-- `namespace`, `name`, `version`: 任务定义标识符
-- `type`: 任务类型（用于快速判断任务类别）
-- `createdBy`: 创建者（用于审计）
+- `namespace`, `name`: 任务定义标识符
+- `version`: 新创建的草稿版本号（`draft-{timestamp}` 格式）
+- `type`: 任务类型
+- `createdBy`: 创建者
 
 ### TaskDefinitionModified
 
-任务定义已修改（草稿版本）。
+任务定义已修改（创建新的草稿版本）。
 
 **消息体结构**：
 
@@ -266,34 +326,38 @@ pipeline:
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440001",
   "eventType": "TaskDefinitionModified",
-  "timestamp": "2025-01-15T11:00:00Z",
+  "timestamp": "2025-01-15T14:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 2,
   "payload": {
     "namespace": "com.company.tasks",
     "name": "data_cleaner",
-    "version": "draft",
-    "modifiedBy": "alice",
-    "changesSummary": {
-      "inputVariablesChanged": true,
-      "outputVariablesChanged": false,
-      "executionConfigChanged": true,
-      "metadataChanged": true
-    }
+    "version": "draft-20250115140000",
+    "previousVersion": "draft-20250115130000",
+    "modifiedBy": "bob"
   }
 }
 ```
 
 **Payload 字段说明**：
 
-- `modifiedBy`: 修改者（用于审计）
-- `changesSummary`: 变更摘要（布尔值标识哪些部分发生了变化）
-  - 订阅者根据此摘要决定是否需要查询完整数据
-  - 不包含具体变更内容，避免与聚合根模型重复定义
+- `version`: 新创建的草稿版本号
+- `previousVersion`: 修改前的版本号
+- `modifiedBy`: 修改者
+
+**查询完整内容**：
+
+```bash
+# 查询新版本的完整定义
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115140000
+
+# 查询前一个版本进行对比
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115130000
+```
 
 ### TaskDefinitionPublished
 
-任务定义已发布（新增已发布版本）。
+任务定义已发布（从草稿版本创建已发布版本）。
 
 **消息体结构**：
 
@@ -301,13 +365,13 @@ pipeline:
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440002",
   "eventType": "TaskDefinitionPublished",
-  "timestamp": "2025-01-15T12:00:00Z",
+  "timestamp": "2025-01-15T15:00:00Z",
   "aggregateId": "com.company.tasks:data_cleaner",
   "version": 3,
   "payload": {
     "namespace": "com.company.tasks",
     "name": "data_cleaner",
-    "fromVersion": "draft",
+    "fromVersion": "draft-20250115140000",
     "toVersion": "1.0.0",
     "publishedBy": "alice",
     "releaseNotes": "Initial release with data cleaning operators"
@@ -317,10 +381,10 @@ pipeline:
 
 **Payload 字段说明**：
 
-- `fromVersion`: 发布前的版本（通常是 "draft"）
-- `toVersion`: 发布后的新版本号
-- `publishedBy`: 发布者（用于审计）
-- `releaseNotes`: 发布说明（用于版本追踪）
+- `fromVersion`: 发布的源草稿版本号
+- `toVersion`: 新的已发布版本号（语义化版本）
+- `publishedBy`: 发布者
+- `releaseNotes`: 发布说明
 
 ---
 
@@ -353,28 +417,32 @@ pipeline:
 ### 使用场景
 
 1. **变更通知**：下游系统订阅事件以响应变化（如缓存失效、触发 CI/CD）
-2. **审计日志**：记录所有变更的时间、操作者和变更摘要
+2. **审计日志**：记录所有变更的时间、操作者和版本信息
 3. **事件溯源**：通过 `aggregateId` 和 `version` 查询聚合根的完整事件历史
 4. **最终一致性**：异步传播变更到读模型或其他系统
+5. **版本追溯**：通过事件中的版本号可以查询任何时刻的完整状态
 
 ### 查询完整数据
 
-事件订阅者如需获取完整的任务定义数据，应通过以下 API 查询：
+事件订阅者如需获取完整的任务定义数据，应通过版本号查询：
 
 ```bash
-# 查询特定版本
-GET /api/v1/task-definitions/{namespace:name:version}
+# 查询特定草稿版本
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115140000
 
-# 示例
-GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
+# 查询最新草稿（简写）
 GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft
+
+# 查询已发布版本
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 ```
 
-这样可以：
+**优点**：
 
-- **避免数据冗余**：事件中不重复存储完整的任务定义结构
-- **获取最新状态**：查询 API 总是返回最新的数据，避免使用事件中的过时快照
+- **避免数据冗余**：事件中不重复存储完整结构
+- **完整可追溯**：任何版本的完整状态都可查询
 - **降低耦合度**：事件结构与聚合根模型独立演进
+- **简化事件处理**：订阅者只需处理轻量级通知
 
 ## 命令
 
@@ -397,7 +465,8 @@ Content-Type: application/json
 ```
 
 **说明**：
-创建一个新的任务定义。系统会自动创建一个 `version=draft` 的草稿版本,此版本处于草稿状态,允许修改但不允许被流水线引用。
+
+创建一个新的任务定义。系统会自动创建初始草稿版本（`draft-{timestamp}` 格式），此版本处于草稿状态，允许修改但不允许被流水线引用。
 
 **返回**：
 
@@ -405,7 +474,7 @@ Content-Type: application/json
 {
   "namespace": "com.company.tasks",
   "name": "data_cleaner",
-  "version": "draft",
+  "version": "draft-20250115100000",
   "status": "DRAFT",
   "type": "ray_operator",
   "metadata": {
@@ -419,8 +488,9 @@ Content-Type: application/json
 **业务规则**：
 
 - `namespace:name` 的组合必须全局唯一（如果已存在，返回 409 Conflict）
+- 系统自动生成版本号：`draft-{YYYYMMDDHHmmss}`
 - 任务类型决定了执行定义需要哪些配置
-- 初始化时草稿版本的输入变量、输出变量、执行定义都为空，需要通过 `ModifyTaskDefinition` 填充
+- 初始化时输入变量、输出变量、执行定义都为空，需要通过 `ModifyTaskDefinition` 填充
 
 ---
 
@@ -444,7 +514,13 @@ Content-Type: application/json
 ```
 
 **说明**：
-修改任务定义的草稿版本。只有 `version=draft` 的草稿版本允许被修改，已发布版本是不可变的。
+
+修改任务定义，创建新的草稿版本。系统会：
+
+1. 读取最新的草稿版本
+2. 应用修改
+3. 创建新的 `draft-{timestamp}` 版本
+4. 保留历史草稿版本（用于追溯）
 
 **返回**：
 
@@ -452,7 +528,8 @@ Content-Type: application/json
 {
   "namespace": "com.company.tasks",
   "name": "data_cleaner",
-  "version": "draft",
+  "version": "draft-20250115140000",
+  "previousVersion": "draft-20250115130000",
   "status": "DRAFT",
   "type": "ray_operator",
   "inputVariables": [...],
@@ -462,17 +539,18 @@ Content-Type: application/json
   "metadata": {
     "description": "更新描述"
   },
-  "updatedAt": "2025-01-15T11:00:00Z",
-  "updatedBy": "alice"
+  "createdAt": "2025-01-15T14:00:00Z",
+  "createdBy": "bob"
 }
 ```
 
 **业务规则**：
 
-- 只能修改 DRAFT 版本（`version=draft`），PUBLISHED 版本不允许修改
+- 只能修改草稿版本，已发布版本不可修改
+- 每次修改创建新版本（追加式，不覆盖）
 - 可以增加、删除或修改 inputVariables 和 outputVariables
 - 可以修改 type，但需要同步更新 executionDefinition
-- 修改后自动更新 updatedAt 和 updatedBy 字段
+- 系统自动生成新版本号和时间戳
 
 ---
 
@@ -485,17 +563,20 @@ POST /api/v1/task-definitions/{namespace:name}/publish
 Content-Type: application/json
 
 {
-  "version": "1.0.0",
+  "fromVersion": "draft-20250115140000",
+  "toVersion": "1.0.0",
   "releaseNotes": "Initial release with data cleaning operators"
 }
 ```
 
 **说明**：
 
-将任务定义的 DRAFT 版本发布为正式版本。发布后该版本变为不可变，可以被 Pipeline 引用。系统会：
+将指定的草稿版本发布为正式版本。发布后该版本变为不可变，可以被 Pipeline 引用。系统会：
 
-1. 将当前 DRAFT 版本复制为新的 PUBLISHED 版本
-2. 设置 status = "PUBLISHED"，记录 publishedAt 和 publishedBy
+1. 读取指定的草稿版本
+2. 创建新的已发布版本（语义化版本号）
+3. 设置 status = "PUBLISHED"，记录 publishedAt 和 publishedBy
+4. 保留原草稿版本（不删除）
 
 **返回**：
 
@@ -516,17 +597,18 @@ Content-Type: application/json
   "releaseNotes": "Initial release with data cleaning operators",
   "createdAt": "2025-01-15T10:00:00Z",
   "createdBy": "alice",
-  "publishedAt": "2025-01-15T12:00:00Z",
+  "publishedAt": "2025-01-15T15:00:00Z",
   "publishedBy": "alice"
 }
 ```
 
 **业务规则**：
 
-- 必须存在草稿版本才能发布
-- 版本号必须遵循语义化版本规范（major.minor.patch）
-- 版本号必须大于该任务的所有已发布版本（递增原则）
-- 发布后已发布版本不可修改
+- `fromVersion` 必须存在且状态为 DRAFT
+- `toVersion` 必须遵循语义化版本规范（major.minor.patch）
+- `toVersion` 必须大于该任务的所有已发布版本（递增原则）
+- 发布后已发布版本不可修改（immutable）
+- 原草稿版本保留，可用于历史追溯
 
 ## 任务查询
 
@@ -541,10 +623,13 @@ GET /api/v1/task-definitions/{namespace:name:version}
 **示例**：
 
 ```bash
-# 获取特定版本
+# 获取已发布版本
 GET /api/v1/task-definitions/com.company.tasks:data_cleaner:1.0.0
 
-# 获取 DRAFT 版本
+# 获取特定草稿版本
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft-20250115140000
+
+# 获取最新草稿版本（简写）
 GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft
 ```
 
@@ -589,17 +674,25 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner:draft
 **请求**：
 
 ```http
-GET /api/v1/task-definitions/{namespace:name}/versions?limit=100&offset=0
+GET /api/v1/task-definitions/{namespace:name}/versions?status=DRAFT&limit=100&offset=0
 ```
 
 **示例**：
 
 ```bash
-GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?limit=100&offset=0
+# 列出所有版本
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions
+
+# 只列出草稿版本
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?status=DRAFT
+
+# 只列出已发布版本
+GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?status=PUBLISHED
 ```
 
 **说明**：
-列出某个任务的所有版本，包括 DRAFT 版本和所有 PUBLISHED 版本。该查询返回版本的完整列表，帮助用户了解任务的演变历史。
+
+列出某个任务的所有版本，包括所有草稿版本和已发布版本。该查询返回版本的完整列表，帮助用户了解任务的演变历史。
 
 **返回**：
 
@@ -609,22 +702,21 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?limit=100&o
   "name": "data_cleaner",
   "versions": [
     {
-      "version": "draft",
+      "version": "draft-20250115140000",
       "status": "DRAFT",
-      "createdAt": "2025-02-20T10:35:00Z",
-      "updatedAt": "2025-02-21T09:15:00Z"
+      "createdAt": "2025-01-15T14:00:00Z",
+      "createdBy": "bob"
     },
     {
-      "version": "1.1.0",
-      "status": "PUBLISHED",
-      "publishedAt": "2025-02-20T10:35:00Z",
-      "publishedBy": "alice",
-      "releaseNotes": "Added support for batch processing"
+      "version": "draft-20250115130000",
+      "status": "DRAFT",
+      "createdAt": "2025-01-15T13:00:00Z",
+      "createdBy": "alice"
     },
     {
       "version": "1.0.0",
       "status": "PUBLISHED",
-      "publishedAt": "2025-02-15T14:25:00Z",
+      "publishedAt": "2025-01-15T12:00:00Z",
       "publishedBy": "alice",
       "releaseNotes": "Initial release"
     }
@@ -633,8 +725,16 @@ GET /api/v1/task-definitions/com.company.tasks:data_cleaner/versions?limit=100&o
 }
 ```
 
+**查询参数**：
+
+- `status`: 可选，过滤版本状态（`DRAFT` 或 `PUBLISHED`）
+- `limit`: 每页返回数量
+- `offset`: 分页偏移量
+
 **业务规则**：
 
 - 返回的版本按时间降序排列（最新的在前）
+- 草稿版本和已发布版本混合展示
+- 可通过 `status` 参数过滤
 
 ---

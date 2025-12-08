@@ -21,7 +21,6 @@ PipelineExecution:
   
   # 定义引用
   pipelineId: string                   # 引用的 PipelineDefinition.id
-  version: string                      # 引用的版本号（如 "1.0.0"）
   
   # 执行状态
   status: enum                         # "running" | "completed" | "failed" | "cancelled"
@@ -38,14 +37,14 @@ PipelineExecution:
       nodeId: string                   # 节点 ID（对应 PipelineDefinition.nodes[].id）
       type: enum                       # "task" | "pipeline"
       status: enum                     # "pending" | "running" | "completed" | "failed" | "skipped" | "cancelled"
-      
+  
       # 子任务/子流水线执行 ID
       executionId: string?             # 引用 TaskExecution.id 或子 PipelineExecution.id
-      
+  
       # 输入输出
       resolvedInputs: Map[string, any] # 解析后的输入变量值
       outputs: Map[string, any]        # 节点的输出变量（任务完成后填充）
-      
+  
       # 事件订阅
       subscribedEvents: List[EventSubscription]
         EventSubscription:
@@ -53,7 +52,7 @@ PipelineExecution:
           eventPattern: string         # 事件模式（如 "node_a.completed"）
           mode: enum                   # "once" | "repeat"
           active: boolean              # 订阅是否仍然活跃
-      
+  
       # 时间戳
       startedAt: timestamp?
       completedAt: timestamp?
@@ -301,10 +300,10 @@ variableContext 结构:
   nodes:
     - id: extract
       startWhen: "event:pipeline.started"
-    
+  
     - id: transform
       startWhen: "event:extract.completed"
-    
+  
     - id: conditional_load
       startWhen: "event:transform.completed && {{ transform.quality_score > 0.9 }}"
   

@@ -1,0 +1,8 @@
+rootProject.name = 'dataflow'
+
+include 'dataflow-client'
+include 'dataflow-adapter'
+include 'dataflow-app'
+include 'dataflow-domain'
+include 'dataflow-infrastructure'
+include 'start'

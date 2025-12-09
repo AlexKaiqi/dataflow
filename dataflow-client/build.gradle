@@ -1,0 +1,10 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Client module - API definitions, DTOs and interfaces'
+
+dependencies {
+    api 'com.alibaba.cola:cola-component-dto'
+    api 'jakarta.validation:jakarta.validation-api'
+}

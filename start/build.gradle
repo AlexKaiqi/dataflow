@@ -1,0 +1,22 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+description = 'Start module - Application entry point'
+
+dependencies {
+    implementation project(':dataflow-adapter')
+    implementation project(':dataflow-infrastructure')
+    
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter'
+    
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+}
+
+tasks.named('bootJar') {
+    archiveBaseName = 'dataflow'
+    archiveVersion = project.version
+}

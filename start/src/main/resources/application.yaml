@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: dataflow
+  
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+  servlet:
+    context-path: /dataflow
+
+logging:
+  level:
+    root: INFO
+    com.tencent.dataflow: DEBUG

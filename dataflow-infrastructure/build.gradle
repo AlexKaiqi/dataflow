@@ -1,0 +1,16 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Infrastructure module - External integrations and technical implementations'
+
+dependencies {
+    api project(':dataflow-domain')
+    
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+}

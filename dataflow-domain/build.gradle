@@ -10,4 +10,5 @@ dependencies {
     api 'com.alibaba.cola:cola-component-statemachine'
     
     implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'jakarta.validation:jakarta.validation-api'
 }

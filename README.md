@@ -247,3 +247,27 @@ pipeline:
 ```
 
 ```
+
+
+
+
+
+endPoint = "http://openapi.wedata.woa.com/dataplatform"
+projectId = "taiji_model_test1"
+folderId = "97160727111246624"
+
+filename = "preTrainStatistic_preTrainStatistic_3_1765198129_cfg"
+fileSuffix = ".yaml"
+proxyAuth = false
+
+
+
+
+
+endPoint = "http://openapi.wedata.woa.com/dataplatform"
+projectId = "2856512666501976064"
+folderId = "97160727111246624"
+
+filename = "preTrainIntegrationPipelineWithoutDeduplication_preTrainIntegration_V3_4_1765198194_cfg"
+fileSuffix = ".yaml"
+proxyAuth = false

@@ -60,29 +60,19 @@ public class TaskVersion {
     private Instant createdAt;
     
     /**
-     * 创建者（仅已发布版本）
+     * 创建者
      */
     private String createdBy;
     
     /**
-     * 最后修改时间（仅草稿版本）
-     */
-    private Instant lastModifiedAt;
-    
-    /**
-     * 最后修改者（仅草稿版本）
-     */
-    private String lastModifiedBy;
-    
-    /**
      * 创建草稿版本
      */
-    public static TaskVersion createDraft(TaskType taskType) {
+    public static TaskVersion createDraft(TaskType taskType, String createdBy) {
         TaskVersion version = new TaskVersion();
         version.version = generateDraftVersion();
         version.status = VersionStatus.DRAFT;
         version.createdAt = Instant.now();
-        version.lastModifiedAt = Instant.now();
+        version.createdBy = createdBy;
         
         // 根据任务类型初始化默认的输入输出变量
         initializeDefaultVariables(version, taskType);
@@ -174,35 +164,38 @@ public class TaskVersion {
     
     /**
      * 添加输入变量
+     * 注意：按照不可变设计，应该通过创建新版本来"修改"
+     * 此方法仅用于版本创建过程中的初始化
      */
     public void addInputVariable(VariableDefinition variable) {
         if (status == VersionStatus.PUBLISHED) {
             throw new IllegalStateException("Cannot modify published version");
         }
         inputVariables.add(variable);
-        lastModifiedAt = Instant.now();
     }
     
     /**
      * 添加输出变量
+     * 注意：按照不可变设计，应该通过创建新版本来"修改"
+     * 此方法仅用于版本创建过程中的初始化
      */
     public void addOutputVariable(VariableDefinition variable) {
         if (status == VersionStatus.PUBLISHED) {
             throw new IllegalStateException("Cannot modify published version");
         }
         outputVariables.add(variable);
-        lastModifiedAt = Instant.now();
     }
     
     /**
      * 更新执行配置
+     * 注意：按照不可变设计，应该通过创建新版本来"修改"
+     * 此方法仅用于版本创建过程中的初始化
      */
     public void updateExecutionConfig(Map<String, Object> config) {
         if (status == VersionStatus.PUBLISHED) {
             throw new IllegalStateException("Cannot modify published version");
         }
         this.executionConfig = config;
-        lastModifiedAt = Instant.now();
     }
     
     /**

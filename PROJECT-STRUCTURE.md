@@ -8,7 +8,7 @@
 
 - **Java**: 21
 - **Spring Boot**: 3.5.8
-- **构建工具**: Gradle 
+- **构建工具**: Gradle
 - **架构**: COLA (阿里巴巴开源的整洁分层架构)
 - **持久层**: MyBatis 3.0.3
 - **数据库**: MySQL / H2
@@ -65,14 +65,16 @@ dataflow/
 ## COLA 架构分层说明
 
 ### 1. Client 层 (dataflow-client)
+
 - **职责**: 对外API定义、DTO定义
 - **依赖**: 无业务依赖
-- **特点**: 
+- **特点**:
   - 可被外部系统依赖
   - 只包含接口和DTO
   - 使用 COLA 的 DTO 组件
 
 ### 2. Adapter 层 (dataflow-adapter)
+
 - **职责**: 处理外部请求，协议转换
 - **依赖**: Client、App
 - **包含**:
@@ -82,6 +84,7 @@ dataflow/
   - WebSocket 处理器
 
 ### 3. App 层 (dataflow-app)
+
 - **职责**: 应用服务编排，业务流程控制
 - **依赖**: Client、Domain
 - **包含**:
@@ -90,6 +93,7 @@ dataflow/
   - 应用服务编排
 
 ### 4. Domain 层 (dataflow-domain)
+
 - **职责**: 核心业务逻辑，领域模型
 - **依赖**: 最少依赖，保持纯净
 - **包含**:
@@ -99,6 +103,7 @@ dataflow/
   - 网关接口定义 (Gateway Interface)
 
 ### 5. Infrastructure 层 (dataflow-infrastructure)
+
 - **职责**: 技术实现，外部系统集成
 - **依赖**: Domain
 - **包含**:
@@ -108,6 +113,7 @@ dataflow/
   - 网关接口实现
 
 ### 6. Start 层
+
 - **职责**: 应用启动和配置
 - **依赖**: Adapter、Infrastructure
 - **包含**:
@@ -187,27 +193,28 @@ open build/reports/tests/test/index.html
 
 ### 模块开发原则
 
-1. **Client 模块**: 
+1. **Client 模块**:
+
    - 只定义接口和DTO
    - 不包含任何实现逻辑
    - 可以被其他系统依赖
-
 2. **Domain 模块**:
+
    - 保持纯净，最少依赖
    - 包含核心业务逻辑
    - 定义 Gateway 接口，不实现
-
 3. **App 模块**:
+
    - 编排业务流程
    - 调用 Domain 层服务
    - 通过 Gateway 访问基础设施
-
 4. **Infrastructure 模块**:
+
    - 实现 Gateway 接口
    - 处理所有技术细节
    - 不包含业务逻辑
-
 5. **Adapter 模块**:
+
    - 处理协议转换
    - 调用 App 层服务
    - 返回统一响应格式
@@ -223,23 +230,16 @@ open build/reports/tests/test/index.html
 ## 配置说明
 
 ### application.yaml
+
 主配置文件，包含通用配置。
 
 ### application-dev.yaml
+
 开发环境配置，包含本地数据库连接等。
 
 ### application-prod.yaml
+
 生产环境配置。
-
-## 与原项目的对比
-
-| 特性 | Code 项目 | Cola 项目 | 新项目 |
-|-----|----------|----------|--------|
-| 构建工具 | Gradle | Maven | **Gradle** ✓ |
-| Spring Boot 版本 | 3.5.8 | 2.7.2 | **3.5.8** ✓ |
-| Java 版本 | 21 | 8 | **21** ✓ |
-| 架构风格 | 传统分层 | COLA | **COLA** ✓ |
-| 模块化 | 单模块 | 多模块 | **多模块** ✓ |
 
 ## 下一步计划
 

@@ -74,14 +74,14 @@ public class TaskDefinition {
         task.createdAt = Instant.now();
         
         // 自动创建初始草稿版本
-        TaskVersion initialVersion = TaskVersion.createDraft(type);
+        TaskVersion initialVersion = TaskVersion.createDraft(type, createdBy);
         task.versions.add(initialVersion);
         
         return task;
     }
     
     /**
-     * 创建新的草稿版本
+     * 创建新的草稿版本（基于最新草稿）
      */
     public TaskVersion createNewDraftVersion(String createdBy) {
         TaskVersion latestDraft = getLatestDraftVersion();
@@ -90,11 +90,10 @@ public class TaskDefinition {
         }
         
         // 基于最新草稿创建新版本
-        TaskVersion newVersion = TaskVersion.createDraft(type);
+        TaskVersion newVersion = TaskVersion.createDraft(type, createdBy);
         newVersion.setInputVariables(new ArrayList<>(latestDraft.getInputVariables()));
         newVersion.setOutputVariables(new ArrayList<>(latestDraft.getOutputVariables()));
         newVersion.setExecutionConfig(latestDraft.getExecutionConfig());
-        newVersion.setLastModifiedBy(createdBy);
         
         versions.add(0, newVersion); // 添加到列表头部
         return newVersion;

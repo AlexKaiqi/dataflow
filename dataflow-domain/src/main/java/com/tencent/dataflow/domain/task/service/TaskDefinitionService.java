@@ -210,7 +210,7 @@ public class TaskDefinitionService {
                 .name(taskDef.getName())
                 .version(newVersion.getVersion())
                 .basedOn(basedOn)
-                .createdBy(newVersion.getLastModifiedBy())
+                .createdBy(newVersion.getCreatedBy())
                 .build())
             .build();
         

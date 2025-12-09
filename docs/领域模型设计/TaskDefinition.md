@@ -111,11 +111,12 @@ versions:
 - **事件**：started, completed, failed
 - **输出变量示例**：rows_affected, query_time
 
-#### Ray 任务
+#### Ray 算子任务
 
 - **行为**：start, retry
 - **事件**：started, completed, failed
-- **输出变量示例**：tasks_completed, processing_time
+- **输出变量示例**：rows_processed, operators_executed, execution_time
+- **特点**：支持声明多个算子，按顺序执行数据处理流水线（如 DataJuicer、自定义算子等）
 
 ### 流处理任务
 

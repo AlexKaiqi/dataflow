@@ -25,11 +25,12 @@ public enum TaskType {
     SQL_OPERATOR("SQL批处理任务"),
     
     /**
-     * Ray 分布式计算任务
+     * Ray 算子任务
+     * 支持声明多个算子的数据处理流水线（如 DataJuicer 等）
      * 行为: start, retry
      * 事件: started, completed, failed
      */
-    RAY_OPERATOR("Ray分布式计算任务"),
+    RAY_OPERATOR("Ray算子任务"),
     
     /**
      * 流处理任务

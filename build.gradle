@@ -123,8 +123,14 @@ allprojects {
         toolVersion = '7.7.0'
         consoleOutput = true
         ignoreFailures = true  // 初期设置为警告，不中断构建
-        ruleSetFiles = files(rootProject.file('config/pmd/ruleset.xml'))
-        ruleSets = []  // 使用自定义规则集
+        // 使用 PMD 官方推荐的规则集
+        // quickstart.xml: 快速开始规则集（平衡严格性和实用性）
+        // 或使用 ruleset.xml: 自定义规则集（针对项目优化）
+        ruleSetFiles = files(
+            rootProject.file('config/pmd/quickstart.xml'),  // PMD 官方推荐
+            // rootProject.file('config/pmd/ruleset.xml')   // 自定义规则（可选）
+        )
+        ruleSets = []  // 使用自定义规则集文件
     }
 
     tasks.withType(Pmd) {

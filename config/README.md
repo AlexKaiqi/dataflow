@@ -72,11 +72,31 @@ checkstyle {
 
 ## 📋 PMD 配置
 
+### 当前使用：PMD 官方 Quickstart 规则集 ✅
+
+**文件**：`pmd/quickstart.xml`
+
+**来源**：[PMD 官方 Quickstart](https://github.com/pmd/pmd/blob/master/pmd-java/src/main/resources/rulesets/java/quickstart.xml)
+
+**特点**：
+- ✅ PMD 官方维护的推荐规则集
+- ✅ 平衡严格性和实用性
+- ✅ 包含最重要的代码质量规则
+- ✅ 适合快速上手和生产环境
+
+**下载/更新命令**：
+```bash
+curl -o config/pmd/quickstart.xml \
+  https://raw.githubusercontent.com/pmd/pmd/master/pmd-java/src/main/resources/rulesets/java/quickstart.xml
+```
+
+### 备选：自定义规则集
+
 **文件**：`pmd/ruleset.xml`
 
-**来源**：基于 [PMD 官方规则集](https://docs.pmd-code.org/latest/pmd_rules_java.html)
+**用途**：针对项目特点定制的规则集
 
-**规则集**：
+**包含的规则类别**：
 - `category/java/bestpractices.xml` - 最佳实践
 - `category/java/codestyle.xml` - 代码风格
 - `category/java/design.xml` - 设计原则
@@ -87,17 +107,16 @@ checkstyle {
 - `category/java/security.xml` - 安全
 
 **自定义说明**：
+1. 排除了过于严格的规则（如强制注释）
+2. 放宽了复杂度限制（适应业务逻辑）
+3. 兼容 Lombok（排除与 Lombok 冲突的规则）
+4. 兼容测试代码（允许测试中的 System.out.println）
 
-当前配置基于 PMD 官方规则集，并针对项目特点做了以下调整：
+### 参考资源
 
-1. **排除了过于严格的规则**（如强制注释）
-2. **放宽了复杂度限制**（适应业务逻辑）
-3. **兼容 Lombok**（排除与 Lombok 冲突的规则）
-4. **兼容测试代码**（允许测试中的 System.out.println）
-
-**参考资源**：
 - [PMD Java Rules](https://docs.pmd-code.org/latest/pmd_rules_java.html)
-- [PMD Rule Sets](https://github.com/pmd/pmd/tree/master/pmd-java/src/main/resources/category/java)
+- [PMD Official Rulesets](https://github.com/pmd/pmd/tree/master/pmd-java/src/main/resources/rulesets/java)
+- [PMD Quickstart Guide](https://docs.pmd-code.org/latest/pmd_userdocs_quickstart.html)
 
 ## 🛡️ OWASP Dependency Check 配置
 

@@ -19,9 +19,10 @@
 
 ### 3. PMD - 代码质量检查
 - **用途**: 检测常见的编程缺陷（未使用的变量、空 catch 块、过度复杂的代码等）
-- **标准**: **PMD 官方规则集 (category/java/*.xml)**
-- **配置**: `config/pmd/ruleset.xml` (基于官方规则，项目定制)
-- **来源**: [PMD Java Rules](https://docs.pmd-code.org/latest/pmd_rules_java.html)
+- **标准**: **PMD 官方 Quickstart 规则集** ✅
+- **配置**: `config/pmd/quickstart.xml` (PMD 官方推荐)
+- **来源**: [PMD Quickstart](https://github.com/pmd/pmd/blob/master/pmd-java/src/main/resources/rulesets/java/quickstart.xml)
+- **备选**: `config/pmd/ruleset.xml` (自定义规则集)
 
 ### 4. SpotBugs - 静态代码分析
 - **用途**: 查找潜在的 bug 和安全漏洞

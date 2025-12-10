@@ -11,10 +11,11 @@
 
 ### 2. Checkstyle - 代码风格检查
 - **用途**: 检查代码风格是否符合规范
-- **标准**: **Sun Java Style (官方标准配置)**
-- **配置**: `config/checkstyle/sun_checks.xml`
-- **来源**: [Sun Checkstyle](https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/sun_checks.xml)
-- **备选**: `google_checks.xml` (需要 Checkstyle 10.20+)
+- **标准**: **Google Java Style (官方标准配置)** ✅
+- **版本**: Checkstyle 10.20.0
+- **配置**: `config/checkstyle/google_checks.xml`
+- **来源**: [Google Checkstyle](https://github.com/checkstyle/checkstyle/blob/checkstyle-10.20.0/src/main/resources/google_checks.xml)
+- **备选**: `sun_checks.xml` (传统标准)
 
 ### 3. PMD - 代码质量检查
 - **用途**: 检测常见的编程缺陷（未使用的变量、空 catch 块、过度复杂的代码等）

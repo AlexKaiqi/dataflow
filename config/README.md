@@ -18,11 +18,13 @@ config/
 
 ## 🎯 Checkstyle 配置
 
-### 当前使用：Google Java Style（官方标准）
+### 当前使用：Google Java Style（官方标准）✅
 
 **文件**：`checkstyle/google_checks.xml`
 
-**来源**：[Checkstyle 官方 GitHub](https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/google_checks.xml)
+**版本**：Checkstyle 10.20.0
+
+**来源**：[Checkstyle 官方 GitHub](https://github.com/checkstyle/checkstyle/blob/checkstyle-10.20.0/src/main/resources/google_checks.xml)
 
 **特点**：
 - ✅ Google 官方维护
@@ -32,8 +34,9 @@ config/
 
 **下载/更新命令**：
 ```bash
+# 下载与 Checkstyle 10.20.0 版本匹配的配置
 curl -o config/checkstyle/google_checks.xml \
-  https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/google_checks.xml
+  https://raw.githubusercontent.com/checkstyle/checkstyle/checkstyle-10.20.0/src/main/resources/google_checks.xml
 ```
 
 ### 备选：Sun Java Style（传统标准）
@@ -61,7 +64,7 @@ curl -o config/checkstyle/sun_checks.xml \
 checkstyle {
     // 使用 Google 风格（当前）
     configFile = file("${rootDir}/config/checkstyle/google_checks.xml")
-    
+
     // 或使用 Sun 风格
     // configFile = file("${rootDir}/config/checkstyle/sun_checks.xml")
 }
@@ -167,21 +170,21 @@ dependency-check: 11.1.1
 
 ### Q: 如何定制规则？
 
-**A**: 
+**A**:
 1. **不推荐修改官方配置文件**（会失去更新能力）
 2. **推荐方式**：在 `build.gradle` 中排除特定规则
 3. **或者**：复制官方配置，重命名后修改
 
 ### Q: 配置文件冲突怎么办？
 
-**A**: 
+**A**:
 - Spotless 和 Checkstyle 可能有不同的格式要求
 - 建议以 Spotless (Google Java Format) 为准
 - Checkstyle 设置 `ignoreFailures = true` 作为警告
 
 ### Q: 如何查看规则详情？
 
-**A**: 
+**A**:
 - 打开对应的 XML 文件
 - 查看官方文档中的规则说明
 - 使用 IDE 插件查看规则描述

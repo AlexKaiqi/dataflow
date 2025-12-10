@@ -24,9 +24,11 @@ Ray 算子任务是一种支持声明式多算子组合的数据处理任务类�
 - **completed**: 任务成功完成
 - **failed**: 任务执行失败
 
-## 输入变量
+## 任务级别的输入输出
 
-### 必需变量
+Ray 算子任务作为一个整体，对外暴露的输入输出变量：
+
+### 输入变量
 
 ```yaml
 inputVariables:
@@ -41,51 +43,35 @@ inputVariables:
     description: "输出数据路径"
 ```
 
-### 可选变量
-
-```yaml
-  - name: operators
-    type: array
-    required: false
-    description: "算子配置列表，定义数据处理流水线"
-    
-  - name: sample_rate
-    type: number
-    required: false
-    default: 1.0
-    description: "数据采样率（0.0-1.0）"
-    
-  - name: num_workers
-    type: number
-    required: false
-    default: 1
-    description: "并行处理的 worker 数量"
-```
-
-## 输出变量
+### 输出变量
 
 ```yaml
 outputVariables:
-  - name: rows_processed
-    type: number
-    description: "处理的数据行数"
-    
-  - name: rows_filtered
-    type: number
-    description: "被过滤掉的数据行数"
-    
-  - name: operators_executed
-    type: number
-    description: "实际执行的算子数量"
-    
-  - name: execution_time
-    type: number
-    description: "任务执行时间（秒）"
-    
   - name: output_path
     type: string
     description: "实际输出路径"
+    
+  - name: rows_input
+    type: number
+    description: "输入数据行数"
+    
+  - name: rows_output
+    type: number
+    description: "输出数据行数（经过所有算子处理后）"
+    
+  - name: execution_time
+    type: number
+    description: "总执行时间（秒）"
 ```
+
+**重要说明**：
+
+- 任务的 `inputVariables` 和 `outputVariables` 是任务对外的接口
+- 内部的多个算子形成一个**处理链**，对同一份数据集进行链式处理
+- 算子之间**不需要显式的输入输出变量**，数据自动流转：
+  - 第一个算子从 `input_path` 读取数据
+  - 中间算子接收上一个算子的输出数据集
+  - 最后一个算子将结果写入 `output_path`
 
 ## 执行配置
 
@@ -96,22 +82,19 @@ executionConfig:
   # 算子框架（可选，默认为 datajuicer）
   framework: "datajuicer"         # datajuicer | custom | other
   
-  # 算子配置列表
+  # 算子处理链（按顺序执行）
   operators:
     - type: "filter"              # 算子类型
-      name: "remove_nulls"        # 算子名称
-      config:                     # 算子特定配置
+      config:                     # 算子配置
         columns: ["text", "label"]
         
     - type: "map"
-      name: "normalize_text"
       config:
         column: "text"
         lowercase: true
         remove_punctuation: true
         
     - type: "dedup"
-      name: "deduplicate"
       config:
         columns: ["text"]
         method: "exact"
@@ -120,11 +103,23 @@ executionConfig:
   resources:
     cpu: 4
     memory: "8G"
-    
-  # 执行参数
-  batch_size: 1000
-  cache_dir: "/tmp/datajuicer"
 ```
+
+**算子链执行流程**：
+
+```text
+input_path (数据集)
+    ↓
+[filter 算子] ← 过滤空值
+    ↓
+[map 算子]    ← 文本规范化
+    ↓
+[dedup 算子]  ← 去重
+    ↓
+output_path (处理后的数据集)
+```
+
+算子之间通过**数据集**自动流转，无需显式指定中间输出路径。
 
 ## 支持的算子类型
 

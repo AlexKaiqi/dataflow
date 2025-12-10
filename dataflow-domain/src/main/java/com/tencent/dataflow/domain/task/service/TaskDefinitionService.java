@@ -124,7 +124,7 @@ public class TaskDefinitionService {
         variable.validate();
         
         // 添加输入变量
-        taskVersion.addInputVariable(variable);
+        taskVersion.getInputVariables().add(variable);
         
         // 保存
         TaskDefinition taskDef = repository.findByNamespaceAndName(namespace, name)
@@ -149,7 +149,7 @@ public class TaskDefinitionService {
         variable.validate();
         
         // 添加输出变量
-        taskVersion.addOutputVariable(variable);
+        taskVersion.getOutputVariables().add(variable);
         
         // 保存
         TaskDefinition taskDef = repository.findByNamespaceAndName(namespace, name)

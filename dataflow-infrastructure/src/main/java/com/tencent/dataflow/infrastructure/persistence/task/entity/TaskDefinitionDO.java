@@ -10,6 +10,9 @@ import java.time.Instant;
 /**
  * TaskDefinitionDO - 任务定义数据对象
  * 
+ * 注意：id 字段仅用于基础设施层的数据库操作，不应暴露到领域层
+ * 领域层使用 (namespace, name) 作为业务标识
+ * 
  * @author dataflow
  */
 @Data
@@ -17,7 +20,7 @@ import java.time.Instant;
 public class TaskDefinitionDO {
     
     /**
-     * 主键ID
+     * 主键ID（仅用于基础设施层，不暴露到领域层）
      */
     @TableId(type = IdType.AUTO)
     private Long id;

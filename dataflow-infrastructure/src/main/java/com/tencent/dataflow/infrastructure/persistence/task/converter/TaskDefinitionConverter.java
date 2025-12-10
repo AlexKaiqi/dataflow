@@ -69,13 +69,14 @@ public class TaskDefinitionConverter {
     /**
      * 版本领域对象转数据对象
      */
-    public static TaskVersionDO versionToDataObject(TaskVersion domain, Long taskDefinitionId) {
+    public static TaskVersionDO versionToDataObject(TaskVersion domain, String namespace, String name) {
         if (domain == null) {
             return null;
         }
         
         TaskVersionDO dataObject = new TaskVersionDO();
-        dataObject.setTaskDefinitionId(taskDefinitionId);
+        dataObject.setNamespace(namespace);
+        dataObject.setName(name);
         dataObject.setVersion(domain.getVersion());
         dataObject.setStatus(domain.getStatus().name());
         

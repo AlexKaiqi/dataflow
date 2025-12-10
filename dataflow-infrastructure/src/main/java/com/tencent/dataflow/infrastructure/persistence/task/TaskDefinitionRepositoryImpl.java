@@ -11,6 +11,7 @@ import com.tencent.dataflow.infrastructure.persistence.task.mapper.TaskDefinitio
 import com.tencent.dataflow.infrastructure.persistence.task.mapper.TaskVersionMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,10 +19,14 @@ import java.util.stream.Collectors;
 
 /**
  * TaskDefinitionRepositoryImpl - 任务定义仓储实现
+ * <p>
+ * 使用 @Validated 注解启用方法参数校验
+ * </p>
  * 
  * @author dataflow
  */
 @Repository
+@Validated
 public class TaskDefinitionRepositoryImpl implements TaskDefinitionRepository {
     
     private final TaskDefinitionMapper taskDefinitionMapper;
@@ -49,21 +54,24 @@ public class TaskDefinitionRepositoryImpl implements TaskDefinitionRepository {
             taskDefinitionMapper.insert(taskDefDO);
         } else {
             // 更新任务定义
+            taskDefDO.setType(taskDefinition.getType().name());
             taskDefDO.setDescription(taskDefinition.getDescription());
             taskDefinitionMapper.updateById(taskDefDO);
         }
         
         // 保存所有版本
-        Long taskDefId = taskDefDO.getId();
+        String namespace = taskDefinition.getNamespace();
+        String name = taskDefinition.getName();
         for (TaskVersion version : taskDefinition.getVersions()) {
             // 检查版本是否已存在
             TaskVersionDO existingVersion = taskVersionMapper.selectOne(
                 new LambdaQueryWrapper<TaskVersionDO>()
-                    .eq(TaskVersionDO::getTaskDefinitionId, taskDefId)
+                    .eq(TaskVersionDO::getNamespace, namespace)
+                    .eq(TaskVersionDO::getName, name)
                     .eq(TaskVersionDO::getVersion, version.getVersion())
             );
             
-            TaskVersionDO versionDO = TaskDefinitionConverter.versionToDataObject(version, taskDefId);
+            TaskVersionDO versionDO = TaskDefinitionConverter.versionToDataObject(version, namespace, name);
             
             if (existingVersion == null) {
                 // 新建版本
@@ -91,7 +99,8 @@ public class TaskDefinitionRepositoryImpl implements TaskDefinitionRepository {
         // 查询所有版本
         List<TaskVersionDO> versionDOs = taskVersionMapper.selectList(
             new LambdaQueryWrapper<TaskVersionDO>()
-                .eq(TaskVersionDO::getTaskDefinitionId, taskDefDO.getId())
+                .eq(TaskVersionDO::getNamespace, namespace)
+                .eq(TaskVersionDO::getName, name)
                 .orderByDesc(TaskVersionDO::getCreatedAt)
         );
         
@@ -101,19 +110,11 @@ public class TaskDefinitionRepositoryImpl implements TaskDefinitionRepository {
     
     @Override
     public Optional<TaskVersion> findByCompositeKey(String namespace, String name, String version) {
-        TaskDefinitionDO taskDefDO = taskDefinitionMapper.selectOne(
-            new LambdaQueryWrapper<TaskDefinitionDO>()
-                .eq(TaskDefinitionDO::getNamespace, namespace)
-                .eq(TaskDefinitionDO::getName, name)
-        );
-        
-        if (taskDefDO == null) {
-            return Optional.empty();
-        }
-        
+        // 直接通过 namespace+name+version 查询，单次查询
         TaskVersionDO versionDO = taskVersionMapper.selectOne(
             new LambdaQueryWrapper<TaskVersionDO>()
-                .eq(TaskVersionDO::getTaskDefinitionId, taskDefDO.getId())
+                .eq(TaskVersionDO::getNamespace, namespace)
+                .eq(TaskVersionDO::getName, name)
                 .eq(TaskVersionDO::getVersion, version)
         );
         
@@ -135,30 +136,15 @@ public class TaskDefinitionRepositoryImpl implements TaskDefinitionRepository {
             .map(taskDefDO -> {
                 List<TaskVersionDO> versionDOs = taskVersionMapper.selectList(
                     new LambdaQueryWrapper<TaskVersionDO>()
-                        .eq(TaskVersionDO::getTaskDefinitionId, taskDefDO.getId())
+                        .eq(TaskVersionDO::getNamespace, taskDefDO.getNamespace())
+                        .eq(TaskVersionDO::getName, taskDefDO.getName())
                         .orderByDesc(TaskVersionDO::getCreatedAt)
                 );
                 return TaskDefinitionConverter.toDomain(taskDefDO, versionDOs);
             })
             .collect(Collectors.toList());
     }
-    
-    @Override
-    public List<TaskDefinition> findAll() {
-        List<TaskDefinitionDO> taskDefDOs = taskDefinitionMapper.selectList(null);
-        
-        return taskDefDOs.stream()
-            .map(taskDefDO -> {
-                List<TaskVersionDO> versionDOs = taskVersionMapper.selectList(
-                    new LambdaQueryWrapper<TaskVersionDO>()
-                        .eq(TaskVersionDO::getTaskDefinitionId, taskDefDO.getId())
-                        .orderByDesc(TaskVersionDO::getCreatedAt)
-                );
-                return TaskDefinitionConverter.toDomain(taskDefDO, versionDOs);
-            })
-            .collect(Collectors.toList());
-    }
-    
+
     @Override
     @Transactional
     public void delete(String namespace, String name) {
@@ -172,10 +158,11 @@ public class TaskDefinitionRepositoryImpl implements TaskDefinitionRepository {
             // 删除所有版本
             taskVersionMapper.delete(
                 new LambdaQueryWrapper<TaskVersionDO>()
-                    .eq(TaskVersionDO::getTaskDefinitionId, taskDefDO.getId())
+                    .eq(TaskVersionDO::getNamespace, namespace)
+                    .eq(TaskVersionDO::getName, name)
             );
             
-            // 删除任务定义
+            // 删除任务定义（MyBatis-Plus 需要 id）
             taskDefinitionMapper.deleteById(taskDefDO.getId());
         }
     }

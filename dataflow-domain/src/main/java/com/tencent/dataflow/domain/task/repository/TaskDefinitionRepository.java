@@ -2,6 +2,8 @@ package com.tencent.dataflow.domain.task.repository;
 
 import com.tencent.dataflow.domain.task.TaskDefinition;
 import com.tencent.dataflow.domain.task.TaskVersion;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,41 +20,69 @@ public interface TaskDefinitionRepository {
     
     /**
      * 保存任务定义
+     * 
+     * @param taskDefinition 任务定义，不能为空
+     * @throws IllegalArgumentException 如果参数为空
      */
-    void save(TaskDefinition taskDefinition);
+    void save(@NotNull TaskDefinition taskDefinition);
     
     /**
      * 根据命名空间和名称查找任务定义
+     * 
+     * @param namespace 命名空间，不能为空或空白
+     * @param name 任务名称，不能为空或空白
+     * @return 任务定义的 Optional
+     * @throws IllegalArgumentException 如果参数为空或空白
      */
-    Optional<TaskDefinition> findByNamespaceAndName(String namespace, String name);
+    Optional<TaskDefinition> findByNamespaceAndName(@NotBlank String namespace, @NotBlank String name);
     
     /**
      * 根据复合键查找特定版本
+     * 
+     * @param namespace 命名空间，不能为空或空白
+     * @param name 任务名称，不能为空或空白
+     * @param version 版本号，不能为空或空白
+     * @return 任务版本的 Optional
+     * @throws IllegalArgumentException 如果参数为空或空白
      */
-    Optional<TaskVersion> findByCompositeKey(String namespace, String name, String version);
+    Optional<TaskVersion> findByCompositeKey(@NotBlank String namespace, @NotBlank String name, @NotBlank String version);
     
     /**
      * 查找命名空间下的所有任务定义
+     * 
+     * @param namespace 命名空间，不能为空或空白
+     * @return 任务定义列表
+     * @throws IllegalArgumentException 如果参数为空或空白
      */
-    List<TaskDefinition> findByNamespace(String namespace);
-    
-    /**
-     * 查找所有任务定义
-     */
-    List<TaskDefinition> findAll();
-    
+    List<TaskDefinition> findByNamespace(@NotBlank String namespace);
+
     /**
      * 删除任务定义
+     * 
+     * @param namespace 命名空间，不能为空或空白
+     * @param name 任务名称，不能为空或空白
+     * @throws IllegalArgumentException 如果参数为空或空白
      */
-    void delete(String namespace, String name);
+    void delete(@NotBlank String namespace, @NotBlank String name);
     
     /**
      * 检查任务定义是否存在
+     * 
+     * @param namespace 命名空间，不能为空或空白
+     * @param name 任务名称，不能为空或空白
+     * @return 是否存在
+     * @throws IllegalArgumentException 如果参数为空或空白
      */
-    boolean exists(String namespace, String name);
+    boolean exists(@NotBlank String namespace, @NotBlank String name);
     
     /**
      * 检查特定版本是否被流水线引用
+     * 
+     * @param namespace 命名空间，不能为空或空白
+     * @param name 任务名称，不能为空或空白
+     * @param version 版本号，不能为空或空白
+     * @return 是否被引用
+     * @throws IllegalArgumentException 如果参数为空或空白
      */
-    boolean isVersionReferenced(String namespace, String name, String version);
+    boolean isVersionReferenced(@NotBlank String namespace, @NotBlank String name, @NotBlank String version);
 }

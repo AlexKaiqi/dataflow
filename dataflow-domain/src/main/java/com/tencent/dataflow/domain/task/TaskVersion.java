@@ -163,30 +163,6 @@ public class TaskVersion {
     }
     
     /**
-     * 添加输入变量
-     * 注意：按照不可变设计，应该通过创建新版本来"修改"
-     * 此方法仅用于版本创建过程中的初始化
-     */
-    public void addInputVariable(VariableDefinition variable) {
-        if (status == VersionStatus.PUBLISHED) {
-            throw new IllegalStateException("Cannot modify published version");
-        }
-        inputVariables.add(variable);
-    }
-    
-    /**
-     * 添加输出变量
-     * 注意：按照不可变设计，应该通过创建新版本来"修改"
-     * 此方法仅用于版本创建过程中的初始化
-     */
-    public void addOutputVariable(VariableDefinition variable) {
-        if (status == VersionStatus.PUBLISHED) {
-            throw new IllegalStateException("Cannot modify published version");
-        }
-        outputVariables.add(variable);
-    }
-    
-    /**
      * 更新执行配置
      * 注意：按照不可变设计，应该通过创建新版本来"修改"
      * 此方法仅用于版本创建过程中的初始化

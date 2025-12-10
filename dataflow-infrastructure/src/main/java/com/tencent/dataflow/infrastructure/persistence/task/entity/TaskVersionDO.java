@@ -27,9 +27,14 @@ public class TaskVersionDO {
     private Long id;
     
     /**
-     * 任务定义ID（外键）
+     * 命名空间
      */
-    private Long taskDefinitionId;
+    private String namespace;
+    
+    /**
+     * 任务名称
+     */
+    private String name;
     
     /**
      * 版本号

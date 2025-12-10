@@ -99,7 +99,10 @@ allprojects {
 
     checkstyle {
         toolVersion = '10.18.2'
-        configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+        // 使用 Sun 官方标准配置（与 Checkstyle 版本兼容）
+        // 来源: https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/sun_checks.xml
+        // Google checks 需要 Checkstyle 10.20+ 版本才支持
+        configFile = rootProject.file('config/checkstyle/sun_checks.xml')
         ignoreFailures = true  // 初期设置为警告，不中断构建
         maxWarnings = 100      // 允许一定数量的警告
         showViolations = true

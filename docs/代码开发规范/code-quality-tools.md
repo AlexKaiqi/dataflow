@@ -11,12 +11,16 @@
 
 ### 2. Checkstyle - 代码风格检查
 - **用途**: 检查代码风格是否符合规范
-- **标准**: 基于 Google Java Style Guide 定制
-- **配置**: `config/checkstyle/checkstyle.xml`
+- **标准**: **Sun Java Style (官方标准配置)**
+- **配置**: `config/checkstyle/sun_checks.xml`
+- **来源**: [Sun Checkstyle](https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/sun_checks.xml)
+- **备选**: `google_checks.xml` (需要 Checkstyle 10.20+)
 
 ### 3. PMD - 代码质量检查
 - **用途**: 检测常见的编程缺陷（未使用的变量、空 catch 块、过度复杂的代码等）
-- **配置**: `config/pmd/ruleset.xml`
+- **标准**: **PMD 官方规则集 (category/java/*.xml)**
+- **配置**: `config/pmd/ruleset.xml` (基于官方规则，项目定制)
+- **来源**: [PMD Java Rules](https://docs.pmd-code.org/latest/pmd_rules_java.html)
 
 ### 4. SpotBugs - 静态代码分析
 - **用途**: 查找潜在的 bug 和安全漏洞

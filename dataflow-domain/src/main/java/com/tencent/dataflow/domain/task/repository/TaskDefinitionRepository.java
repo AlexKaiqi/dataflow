@@ -86,3 +86,4 @@ public interface TaskDefinitionRepository {
      */
     boolean isVersionReferenced(@NotBlank String namespace, @NotBlank String name, @NotBlank String version);
 }
+

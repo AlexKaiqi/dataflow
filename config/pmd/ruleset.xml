@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<ruleset name="Dataflow PMD Rules"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Dataflow 项目 PMD 代码质量规则集
+    </description>
+
+    <!-- 最佳实践 -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- 允许在测试中使用 System.out -->
+        <exclude name="SystemPrintln"/>
+        <!-- 允许使用 JUnit 断言 -->
+        <exclude name="JUnitAssertionsShouldIncludeMessage"/>
+        <!-- 允许在 catch 块中使用通用异常 -->
+        <exclude name="AvoidCatchingGenericException"/>
+    </rule>
+
+    <!-- 代码风格 -->
+    <rule ref="category/java/codestyle.xml">
+        <!-- Lombok 会生成这些方法 -->
+        <exclude name="AtLeastOneConstructor"/>
+        <exclude name="CommentDefaultAccessModifier"/>
+        <exclude name="OnlyOneReturn"/>
+        <exclude name="CallSuperInConstructor"/>
+        <exclude name="LongVariable"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="ShortClassName"/>
+    </rule>
+
+    <!-- 设计原则 -->
+    <rule ref="category/java/design.xml">
+        <!-- 允许更多的依赖 -->
+        <exclude name="LawOfDemeter"/>
+        <exclude name="LoosePackageCoupling"/>
+        <!-- 允许数据类 -->
+        <exclude name="DataClass"/>
+    </rule>
+    
+    <rule ref="category/java/design.xml/TooManyMethods">
+        <properties>
+            <property name="maxmethods" value="20"/>
+        </properties>
+    </rule>
+    
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="15"/>
+        </properties>
+    </rule>
+
+    <!-- 文档 -->
+    <rule ref="category/java/documentation.xml">
+        <!-- 不强制要求所有方法都有注释 -->
+        <exclude name="CommentRequired"/>
+        <exclude name="CommentSize"/>
+    </rule>
+
+    <!-- 错误倾向 -->
+    <rule ref="category/java/errorprone.xml">
+        <!-- 允许 null 赋值 -->
+        <exclude name="NullAssignment"/>
+        <!-- 允许 Bean 中的可变字段 -->
+        <exclude name="DataflowAnomalyAnalysis"/>
+        <!-- 允许在构造函数中调用可重写方法 -->
+        <exclude name="ConstructorCallsOverridableMethod"/>
+    </rule>
+
+    <!-- 多线程 -->
+    <rule ref="category/java/multithreading.xml">
+        <!-- 允许在同步代码块中使用非final字段 -->
+        <exclude name="AvoidSynchronizedAtMethodLevel"/>
+    </rule>
+
+    <!-- 性能 -->
+    <rule ref="category/java/performance.xml">
+        <!-- 允许在循环中创建对象 -->
+        <exclude name="AvoidInstantiatingObjectsInLoops"/>
+    </rule>
+
+    <!-- 安全 -->
+    <rule ref="category/java/security.xml"/>
+
+</ruleset>

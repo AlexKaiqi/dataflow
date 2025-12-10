@@ -172,6 +172,7 @@ public class TaskDefinitionConverter {
     /**
      * Map转变量定义
      */
+    @SuppressWarnings("unchecked")
     private static VariableDefinition mapToVariable(Map<String, Object> map) {
         VariableDefinition.VariableDefinitionBuilder builder = VariableDefinition.builder()
             .name((String) map.get("name"))

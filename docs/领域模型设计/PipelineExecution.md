@@ -18,17 +18,17 @@
 PipelineExecution:
   # 唯一标识
   id: string                           # 执行实例 ID，全局唯一（如 "exec_20250115_001"）
-  
+
   # 定义引用
   pipelineId: string                   # 引用的 PipelineDefinition.id
-  
+
   # 执行状态
-  status: enum                         # "running" | "completed" | "failed" | "cancelled"
-  
+  status: enum                         # "running" | "succeed" | "failed" | "cancelled"
+
   # 输入变量实例
   inputVariables: Map[string, any]     # Pipeline 输入参数的实际值
     # 例如: { "data_source": "s3://bucket/data", "start_date": "2025-01-15" }
-  
+
   # 节点执行记录
   nodeExecutions: Map[string, NodeExecution]
     # key: node.id（节点 ID）
@@ -36,42 +36,42 @@ PipelineExecution:
     NodeExecution:
       nodeId: string                   # 节点 ID（对应 PipelineDefinition.nodes[].id）
       type: enum                       # "task" | "pipeline"
-      status: enum                     # "pending" | "running" | "completed" | "failed" | "skipped" | "cancelled"
-  
+      status: enum                     # "pending" | "running" | "succeed" | "failed" | "skipped" | "cancelled"
+
       # 子任务/子流水线执行 ID
       executionId: string?             # 引用 TaskExecution.id 或子 PipelineExecution.id
-  
+
       # 输入输出
       resolvedInputs: Map[string, any] # 解析后的输入变量值
       outputs: Map[string, any]        # 节点的输出变量（任务完成后填充）
-  
+
       # 事件订阅
       subscribedEvents: List[EventSubscription]
         EventSubscription:
-          expression: string           # 原始表达式（如 "event:node_a.completed"）
-          eventPattern: string         # 事件模式（如 "node_a.completed"）
+          expression: string           # 原始表达式（如 "event:node_a.succeed"）
+          eventPattern: string         # 事件模式（如 "node_a.succeed"）
           mode: enum                   # "once" | "repeat"
           active: boolean              # 订阅是否仍然活跃
-  
+
       # 时间戳
       startedAt: timestamp?
       completedAt: timestamp?
-  
+
   # 执行上下文
   variableContext: Map[string, any]    # 所有变量的当前值（用于表达式求值）
     # 包含：
     # - pipeline.input.*: Pipeline 输入变量
     # - <node_id>.*: 各节点的输出变量
-  
+
   # 事件历史
   eventHistory: List[ExecutionEvent]
     ExecutionEvent:
       eventId: string
-      eventType: string                # 如 "node_a.completed", "pipeline.started"
+      eventType: string                # 如 "node_a.succeed", "pipeline.started"
       timestamp: timestamp
       source: string                   # 事件源（节点 ID 或 "pipeline"）
       payload: object                  # 事件负载
-  
+
   # 元数据
   metadata:
     createdAt: timestamp               # 执行创建时间
@@ -86,10 +86,10 @@ PipelineExecution:
 ```mermaid
 stateDiagram-v2
     [*] --> running
-    running --> completed
+    running --> succeed
     running --> failed
     running --> cancelled
-    completed --> [*]
+    succeed --> [*]
     failed --> [*]
     cancelled --> [*]
 ```
@@ -97,7 +97,7 @@ stateDiagram-v2
 **流水线状态转换说明**：
 
 - `[*] → running`：启动执行（创建+启动），发布 pipeline.started 事件
-- `running → completed`：所有节点成功
+- `running → succeed`：所有节点成功
 - `running → failed`：任一节点失败
 - `running → cancelled`：用户取消
 
@@ -105,7 +105,7 @@ stateDiagram-v2
 
 - `pending`：等待触发（仅用于内部节点，由 Pipeline 创建）
 - `running`：正在执行
-- `completed`：执行成功
+- `succeed`：执行成功
 - `failed`：执行失败
 - `skipped`：被跳过
 - `cancelled`：被取消
@@ -154,16 +154,16 @@ POST /api/v1/pipelines/{pipelineId}/start
    - NodeExecution.startedAt = 当前时间
 
 3. 等待子执行完成
-   - 监听子执行的事件（task.completed, task.failed 等）
+   - 监听子执行的事件（task.succeed, task.failed 等）
 
 4. 处理执行结果
    成功情况:
-     - NodeExecution.status = "completed"
+     - NodeExecution.status = "succeed"
      - NodeExecution.outputs = 子执行的输出
      - 更新 variableContext，添加节点输出变量
-     - 发布 "{node_id}.completed" 事件
+     - 发布 "{node_id}.succeed" 事件
      - 检查 alertWhen 条件，如满足则发送告警
-   
+
    失败情况:
      - NodeExecution.status = "failed"
      - NodeExecution.outputs = 子执行的错误输出变量
@@ -184,14 +184,14 @@ POST /api/v1/pipelines/{pipelineId}/start
   - 所有 NodeExecution 都不在 [pending, running] 状态
 
 完成逻辑:
-  如果所有节点都是 "completed":
-    - PipelineExecution.status = "completed"
-    - 发布 "pipeline.completed" 事件
-  
+  如果所有节点都是 "succeed":
+    - PipelineExecution.status = "succeed"
+    - 发布 "pipeline.succeed" 事件
+
   如果有任一节点是 "failed":
     - PipelineExecution.status = "failed"
     - 发布 "pipeline.failed" 事件
-  
+
   如果有节点是 "cancelled":
     - PipelineExecution.status = "cancelled"
     - 发布 "pipeline.cancelled" 事件
@@ -211,20 +211,20 @@ POST /api/v1/pipelines/{pipelineId}/start
     - 提取所有 event: 引用
     - 提取所有 cron: 引用
     - 创建 EventSubscription 记录
-  
+
   注册到事件总线:
     - 订阅模式：startMode（once/repeat）
     - 回调：触发节点执行逻辑
 
 示例:
   节点配置:
-    startWhen: "event:node_a.completed && event:node_b.completed"
+    startWhen: "event:node_a.succeed&& event:node_b.succeed"
     startMode: "once"
-  
+
   注册订阅:
-    - subscribe("node_a.completed", mode="once")
-    - subscribe("node_b.completed", mode="once")
-  
+    - subscribe("node_a.succeed", mode="once")
+    - subscribe("node_b.succeed", mode="once")
+
   触发条件:
     当两个事件都到达时，评估完整表达式
     如果表达式为 true，触发节点执行
@@ -253,11 +253,11 @@ variableContext 结构:
     input:
       data_source: "s3://bucket/data"
       start_date: "2025-01-15"
-  
+
   extract_data:
     output_path: "s3://bucket/output/extract"
     row_count: 1000000
-  
+
   transform_data:
     output_path: "s3://bucket/output/transform"
     quality_score: 0.95
@@ -265,7 +265,7 @@ variableContext 结构:
 变量解析:
   表达式: "{{ extract_data.output_path }}"
   解析为: "s3://bucket/output/extract"
-  
+
   表达式: "{{ extract_data.row_count + 100 }}"
   解析为: 1000100
 
@@ -285,12 +285,12 @@ variableContext 结构:
      - 如果 startWhen 引用的任一节点 failed
      - 该节点 status = "skipped"
      - skipReason = "upstream_failed: node_x"
-  
+
   2. 条件不满足
      - 如果 startWhen 表达式求值为 false
      - 该节点 status = "skipped"
      - skipReason = "condition_not_met"
-  
+
   3. 流水线被取消
      - 如果用户取消流水线
      - 所有 pending 节点 status = "skipped"
@@ -300,30 +300,30 @@ variableContext 结构:
   nodes:
     - id: extract
       startWhen: "event:pipeline.started"
-  
+
     - id: transform
-      startWhen: "event:extract.completed"
-  
+      startWhen: "event:extract.succeed"
+
     - id: conditional_load
-      startWhen: "event:transform.completed && {{ transform.quality_score > 0.9 }}"
-  
+      startWhen: "event:transform.succeed&& {{ transform.quality_score > 0.9 }}"
+
   执行场景 1: extract 失败
     - extract.status = "failed"
     - transform.status = "skipped" (upstream_failed: extract)
     - conditional_load.status = "skipped" (upstream_failed: transform)
-  
+
   执行场景 2: transform 成功但 quality_score = 0.8
-    - extract.status = "completed"
-    - transform.status = "completed"
+    - extract.status = "succeed"
+    - transform.status = "succeed"
     - conditional_load.status = "skipped" (condition_not_met)
 ```
 
 ### 流水线完成条件
 
 ```yaml
-流水线 completed 的条件:
-  - 所有节点都是 "completed" 或 "skipped"
-  - 至少有一个节点是 "completed"
+流水线 succeed 的条件:
+  - 所有节点都是 "succeed" 或 "skipped"
+  - 至少有一个节点是 "succeed"
 
 流水线 failed 的条件:
   - 有任一关键节点 "failed"
@@ -359,7 +359,7 @@ TaskDefinition                      │              └─ references ─► Pi
        │                            │
        │                            ├─── eventHistory
        │                            │      - pipeline.started
-       │                            │      - node.completed/failed
+       │                            │      - node.succeed/failed
        │                            │
        │                            └─── metadata
        │                                   - createdAt, completedAt
@@ -423,7 +423,7 @@ GET /api/v1/executions/{executionId}
     "extract_data": {
       "nodeId": "extract_data",
       "type": "task",
-      "status": "completed",
+      "status": "succeed",
       "executionId": "task_exec_001",
       "outputs": {
         "output_path": "s3://bucket/output/extract",
@@ -481,7 +481,7 @@ POST /api/v1/executions/{executionId}/cancel
 ### 查询执行历史
 
 ```http
-GET /api/v1/pipelines/{pipelineId}/executions?status=completed&limit=20&offset=0
+GET /api/v1/pipelines/{pipelineId}/executions?status=succeed&limit=20&offset=0
 
 # 响应
 {
@@ -489,7 +489,7 @@ GET /api/v1/pipelines/{pipelineId}/executions?status=completed&limit=20&offset=0
     {
       "executionId": "exec_20250115_001",
       "version": "1.0.0",
-      "status": "completed",
+      "status": "succeed",
       "createdAt": "2025-01-15T10:00:00Z",
       "completedAt": "2025-01-15T10:15:30Z",
       "duration": 930

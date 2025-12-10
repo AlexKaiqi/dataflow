@@ -229,10 +229,10 @@ PipelineDefinition:
 Node:
   alias: string
     description: "节点别名（Alias）：节点在 Pipeline 中的唯一标识"
-  
+
   taskRef: string
     description: "任务引用（TaskRef）：引用的 TaskDefinition 名称"
-  
+
   inputs: object
     description: "输入绑定（Inputs）：将 Node 的输入绑定到 Task 的 inputVariables"
     note: "键是 TaskDefinition.inputVariables 中声明的变量名"
@@ -275,13 +275,13 @@ Node:
   inputs:
     # 字符串拼接
     outputPath: "{{ pipeline.input.basePath }}/merged/{{ pipeline.input.date }}"
-  
+
     # 数值计算
     totalPartitions: "{{ extract.output.partitionNum * 2 }}"
-  
+
     # 条件表达式
     processingMode: "{{ 'batch' if extract.output.rowCount > 10000 else 'streaming' }}"
-  
+
     # 对象构造
     config: |
       {
@@ -289,7 +289,7 @@ Node:
         "location": "{{ pipeline.input.location }}",
         "timestamp": "{{ extract.output.completedAt }}"
       }
-  
+
     # 数组操作
     paths: "{{ extract.output.paths + transform.output.paths }}"
 ```
@@ -321,7 +321,7 @@ PipelineDefinition:
       inputs:
         # 引用上游输出
         inputPath: "{{ extract.output.filePath }}"
-    
+
         # 数据转换
         config: |
           {
@@ -389,7 +389,7 @@ VariablePool[execution_id]:
   pipeline:
     input: {}     # Pipeline 的输入变量（PipelineExecution 创建时设置）
     output: {}    # Pipeline 的输出变量（PipelineExecution 完成后设置）
-  
+
   nodes:
     <nodeAlias>:  # 每个节点（无论是否执行）
       output: {}    # 节点的输出变量（Task 成功完成后写入）
@@ -458,7 +458,7 @@ TaskDefinition.inputVariables:
 
 Node.inputs:
   # 缺少 modelVersion
-  
+
 # 错误：Required variable 'modelVersion' is missing
 
 ---
@@ -470,7 +470,7 @@ TaskDefinition.inputVariables:
 
 Node.inputs:
   partitionNum: "{{ pipeline.input.location }}"  # location 是 string
-  
+
 # 错误：Type mismatch for 'partitionNum': expected number, got string
 
 ---
@@ -478,7 +478,7 @@ Node.inputs:
 # 场景 3：引用不存在的变量
 Node.inputs:
   inputPath: "{{ nonexistent.output.path }}"
-  
+
 # 错误：Variable 'nonexistent.output.path' not found in context
 
 ---
@@ -492,7 +492,7 @@ TaskDefinition.inputVariables:
 
 Node.inputs:
   modelVersion: "{{ pipeline.input.version }}"  # version = "1.0"
-  
+
 # 错误：Validation failed for 'modelVersion': does not match pattern
 ```
 
@@ -512,7 +512,7 @@ Node:
   # Expression：定义何时执行
   startWhen: "event:extract.succeeded"
   skipWhen: "{{ extract.output.rowCount == 0 }}"
-  
+
   # Variable：定义如何获取输入
   inputs:
     inputPath: "{{ extract.output.filePath }}"

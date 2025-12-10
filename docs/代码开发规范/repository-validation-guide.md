@@ -14,13 +14,13 @@
 void save(@NotNull TaskDefinition taskDefinition);
 ```
 
-### 2. `@NotBlank`  
+### 2. `@NotBlank`
 用于字符串参数，确保参数不为 `null`、不为空字符串、不为纯空白字符。
 
 **示例：**
 ```java
 Optional<TaskDefinition> findByNamespaceAndName(
-    @NotBlank String namespace, 
+    @NotBlank String namespace,
     @NotBlank String name
 );
 ```

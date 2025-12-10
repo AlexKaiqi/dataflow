@@ -98,6 +98,15 @@ public class VariableDefinition {
                         "Default value for variable '" + name + "' must be a Boolean");
                 }
                 break;
+            case OBJECT:
+                // Object类型可以接受任何值
+                break;
+            case FILE:
+                // FILE类型验证可以后续扩展
+                break;
+            case ARRAY:
+                // ARRAY类型验证可以后续扩展
+                break;
             // 其他类型的验证可以后续扩展
         }
     }

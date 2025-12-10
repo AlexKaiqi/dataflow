@@ -17,26 +17,26 @@
 TaskExecution:
   # 唯一标识
   id: string                           # 执行实例 ID，全局唯一（如 "task_exec_001"）
-  
+
   # 定义引用
   taskNamespace: string                # 任务命名空间
   taskName: string                     # 任务名称
   taskVersion: string                  # 任务版本号
-  
+
   # 执行状态
   status: enum                         # "running" | "completed" | "failed" | "stopped"
-  
+
   # 输入输出
   inputs: Map[string, any]             # 实际解析的输入变量值
   outputs: Map[string, any]?           # 任务输出变量
     # - completed 状态：包含任务定义的输出变量
     # - failed 状态：包含错误相关的输出变量（如 error_type, error_message, error_code）
-  
+
   # 时间戳
   createdAt: timestamp                 # 创建时间
   startedAt: timestamp?                # 开始执行时间
   completedAt: timestamp?              # 完成时间
-  
+
   # 元数据
   metadata:
     createdBy: string                  # 执行发起者
@@ -102,7 +102,7 @@ stateDiagram-v2
      - completedAt = 当前时间
      - 发布 "{task_namespace}.{task_name}.completed" 事件
      - 事件负载包含 outputs
-   
+
    失败情况:
      - status: running → failed
      - outputs = 错误相关的输出变量（error_type, error_message, error_code 等）
@@ -129,7 +129,7 @@ stateDiagram-v2
      - 优雅关闭流处理作业
      - status: running → stopped
      - 发布 "{task_namespace}.{task_name}.stopped" 事件
-   
+
    重启操作:
      - 从 stopped 状态重新启动
      - status: stopped → running
@@ -157,19 +157,19 @@ stateDiagram-v2
 2. 等待审批
    - 任务进入等待状态
    - 定期检查超时条件
-   
+
    审批通过:
      - 外部系统回调 API
      - status: running → completed
      - outputs = { "approved": true, "approver": "alice", "comment": "..." }
      - 发布 "*.approved" 事件
-   
+
    审批拒绝:
      - 外部系统回调 API
      - status: running → failed
      - outputs = { "rejected": true, "rejector": "bob", "reason": "..." }
      - 发布 "*.rejected" 事件
-   
+
    超时:
      - 达到超时时间
      - status: running → failed
@@ -225,7 +225,7 @@ stateDiagram-v2
 示例:
   节点配置:
     retryWhen: "event:transform.failed && {{ transform.retryCount < 3 }}"
-  
+
   执行流程:
     第 1 次执行失败 → retryCount = 1 → 重试
     第 2 次执行失败 → retryCount = 2 → 重试

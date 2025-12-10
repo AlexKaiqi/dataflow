@@ -38,14 +38,14 @@ pipeline:
     - name: load_raw_text
       type: sql
       source: iceberg://raw_corpus
-  
+
     - name: clean_and_filter
       type: pyspark
       dependencies: [load_raw_text]
       startWhen: "event:load_raw_text.completed"
       script: |
         # 去除 HTML、去重、质量过滤
-  
+
     - name: tokenize
       type: pyspark
       dependencies: [clean_and_filter]
@@ -68,11 +68,11 @@ pipeline:
     - name: decode_videos
       type: ray  # 利用 Ray 的分布式 GPU 支持
       source: ceph://raw_videos
-  
+
     - name: quality_filter
       dependencies: [decode_videos]
       startWhen: "event:decode_videos.completed"
-  
+
     - name: object_detection
       dependencies: [quality_filter]
       startWhen: "event:quality_filter.completed"
@@ -95,17 +95,17 @@ pipeline:
       type: streaming
       source: kafka://user_content
       startWhen: "cron:* * * * *"  # 持续运行
-  
+
     - name: auto_review
       dependencies: [consume_stream]
       startWhen: "event:consume_stream.data_available"
-  
+
     - name: human_approval
       type: approval  # 人工审批任务
       dependencies: [auto_review]
       startWhen: "event:auto_review.completed && {{ quality_score < 0.8 }}"
       timeout: 24h
-  
+
     - name: merge_to_dataset
       dependencies: [human_approval]
       startWhen: "event:human_approval.approved"

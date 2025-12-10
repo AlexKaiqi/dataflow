@@ -15,7 +15,7 @@ SQL 任务采用**模板替换**方式传递变量：
 示例：
 
 ```sql
-SELECT * FROM {input_table} 
+SELECT * FROM {input_table}
 WHERE date BETWEEN '{start_date}' AND '{end_date}'
   AND user_id IN ({user_ids})
 ```
@@ -25,19 +25,19 @@ WHERE date BETWEEN '{start_date}' AND '{end_date}'
 ```yaml
 executionDefinition:
   engine: "hive" | "spark_sql" | "presto" | "trino" | "iceberg"
-  
+
   query: string                    # SQL 查询语句（支持模板变量）
-  
+
   database: string?                # 默认数据库（可选）
-  
+
   # 输出配置（可选，仅当 SQL 需要写入结果时）
-  outputFormat: "parquet" | "orc" | "csv" | "json"?  
+  outputFormat: "parquet" | "orc" | "csv" | "json"?
     # 输出文件格式
     # - parquet: 列式存储，压缩率高，适合分析查询
     # - orc: 列式存储，优化的 Hive 格式
     # - csv: 文本格式，易读但性能较低
     # - json: JSON 格式，适合半结构化数据
-  
+
   outputMode: "overwrite" | "append" | "error_if_exists"?
     # 输出模式
     # - overwrite: 覆盖已存在的数据
@@ -60,7 +60,7 @@ TaskDefinition:
   version: "1.0.0"
   status: "PUBLISHED"
   type: "sql"
-  
+
   inputVariables:
     - name: "start_date"
       type: "string"
@@ -71,7 +71,7 @@ TaskDefinition:
     - name: "output_table"
       type: "string"
       description: "输出表名"
-  
+
   outputVariables:
     - name: "output_table"
       type: "string"
@@ -79,14 +79,14 @@ TaskDefinition:
     - name: "record_count"
       type: "integer"
       description: "记录数"
-  
+
   executionDefinition:
     engine: "spark_sql"
     database: "analytics"
-    
+
     query: |
       INSERT INTO {output_table}
-      SELECT 
+      SELECT
         user_id,
         COUNT(*) as event_count,
         COUNT(DISTINCT event_type) as event_type_count,
@@ -95,10 +95,10 @@ TaskDefinition:
       FROM events
       WHERE event_date BETWEEN '{start_date}' AND '{end_date}'
       GROUP BY user_id
-    
+
     outputFormat: "parquet"
     outputMode: "overwrite"
-  
+
   metadata:
     description: "用户统计报表"
 ```
@@ -112,7 +112,7 @@ TaskDefinition:
   version: "1.0.0"
   status: "PUBLISHED"
   type: "sql"
-  
+
   inputVariables:
     - name: "snapshot_date"
       type: "string"
@@ -120,18 +120,18 @@ TaskDefinition:
     - name: "min_amount"
       type: "integer"
       description: "最小金额阈值"
-  
+
   outputVariables:
     - name: "result_count"
       type: "integer"
       description: "结果记录数"
-  
+
   executionDefinition:
     engine: "iceberg"
     database: "analytics_db"
-    
+
     query: |
-      SELECT 
+      SELECT
         category,
         SUM(amount) as total_amount,
         COUNT(*) as transaction_count
@@ -140,7 +140,7 @@ TaskDefinition:
         AND amount >= {min_amount}
       GROUP BY category
       ORDER BY total_amount DESC
-  
+
   metadata:
     description: "Iceberg 表分析查询"
 ```
@@ -150,8 +150,8 @@ TaskDefinition:
 SQL 查询支持参数化，使用 `{variable_name}` 语法引用 `inputVariables`：
 
 ```sql
-SELECT * 
-FROM orders 
+SELECT *
+FROM orders
 WHERE order_date BETWEEN '{start_date}' AND '{end_date}'
   AND status = '{status}'
 ```

@@ -13,12 +13,12 @@ executionDefinition:
     url: string                    # 代码仓库 URL 或存储路径
     ref: string?                   # Git 分支/标签
     path: string?                  # 代码文件路径
-  
+
   operators:
     - name: string                 # 算子名称
       class: string                # 算子类全限定名
       config: object               # 算子配置参数
-  
+
   sparkConfig: object?             # Spark 配置（可选）
     spark.sql.shuffle.partitions: string
     spark.default.parallelism: string
@@ -49,11 +49,11 @@ from pyspark.sql import DataFrame, SparkSession
 
 class PySparkOperator(ABC):
     """PySpark 算子基类"""
-  
+
     def __init__(self, spark: SparkSession, config: Dict[str, Any]):
         """
         初始化算子
-      
+
         Args:
             spark: SparkSession 实例（由执行引擎注入）
             config: 算子配置参数（来自 executionDefinition.operators[].config）
@@ -61,34 +61,34 @@ class PySparkOperator(ABC):
         """
         self.spark = spark
         self.config = config
-  
+
     @abstractmethod
     def process(self, **kwargs) -> Any:
         """
         处理输入数据
-      
+
         参数注入机制：
             - 执行引擎通过反射获取 process 方法的参数签名
             - 参数名必须与 TaskDefinition.inputVariables[].name 匹配
             - 执行引擎自动从 Node.inputBindings 中获取值并注入
             - 对于 DataFrame 类型，执行引擎自动从数据源加载
-      
+
         返回值绑定机制：
             - 单个返回值：自动绑定到第一个 outputVariable
             - 多个返回值（Tuple）：按位置顺序绑定到 outputVariables
             - Dict 返回值：按 key 匹配 outputVariables[].name 进行绑定
-      
+
         示例：
             # 单输入单输出
             def process(self, input_df: DataFrame) -> DataFrame:
                 return input_df.filter(...)
-          
+
             # 多输入多输出（Tuple）
             def process(self, users_df: DataFrame, events_df: DataFrame) -> Tuple[DataFrame, int]:
                 result_df = users_df.join(events_df, ...)
                 count = result_df.count()
                 return result_df, count
-          
+
             # 多输出（Dict）
             def process(self, input_df: DataFrame) -> Dict[str, Any]:
                 return {
@@ -107,11 +107,11 @@ TaskDefinition:
   namespace: "com.company.etl"
   name: "用户画像 ETL"
   type: "pyspark_operator"
-  
+
   versions:
     - version: "1.0.0"
       status: "PUBLISHED"
-    
+
       inputVariables:
         - name: "user_base_path"
           type: "string"
@@ -122,7 +122,7 @@ TaskDefinition:
         - name: "output_path"
           type: "string"
           description: "输出路径"
-    
+
       outputVariables:
         - name: "output_path"
           type: "string"
@@ -130,28 +130,28 @@ TaskDefinition:
         - name: "processed_count"
           type: "integer"
           description: "处理的用户数"
-    
+
       executionDefinition:
         codeLocation:
           type: "git"
           url: "https://github.com/company/spark-operators.git"
           ref: "v1.2.0"
           path: "operators/user_profile.py"
-      
+
         operators:
           - name: "join_user_behavior"
             class: "user_profile.JoinUserBehavior"
             config:
               join_type: "left"
               behavior_window_days: 90
-        
+
           - name: "compute_rfm"
             class: "user_profile.ComputeRFM"
             config:
               recency_bins: [7, 30, 90, 180]
               frequency_bins: [1, 5, 20, 50]
               monetary_bins: [100, 500, 2000, 10000]
-        
+
           - name: "feature_engineering"
             class: "user_profile.FeatureEngineering"
             config:
@@ -160,12 +160,12 @@ TaskDefinition:
                 - "purchase_frequency"
                 - "favorite_category"
                 - "churn_probability"
-      
+
         sparkConfig:
           spark.sql.shuffle.partitions: "400"
           spark.default.parallelism: "400"
           spark.sql.adaptive.enabled: "true"
-    
+
       resources:
         cpu: "4"
         memory: "8Gi"

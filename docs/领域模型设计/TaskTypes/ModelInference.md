@@ -12,19 +12,19 @@ executionDefinition:
     type: "mlflow" | "s3" | "local"
     url: string                    # 模型存储位置
     version: string?               # 模型版本（type=mlflow 时）
-  
+
   featureEngineering:              # 特征工程（可选）
     codeLocation:
       type: "git" | "s3" | "local"
       url: string
       ref: string?
       path: string?
-    
+
     operators:
       - name: string               # 特征算子名称
         class: string              # 算子类全限定名
         config: object             # 算子配置
-  
+
   inferenceConfig:
     batchSize: integer             # 批处理大小
     framework: "pytorch" | "tensorflow" | "onnx" | "sklearn"
@@ -56,31 +56,31 @@ import pandas as pd
 
 class FeatureOperator(ABC):
     """特征工程算子基类"""
-    
+
     def __init__(self, config: Dict[str, Any]):
         """
         初始化算子
-        
+
         Args:
             config: 算子配置参数（来自 executionDefinition.featureEngineering.operators[].config）
         """
         self.config = config
-    
+
     @abstractmethod
     def process(self, **kwargs) -> Any:
         """
         处理特征数据
-        
+
         参数注入机制：
             - 参数名必须与 TaskDefinition.inputVariables[].name 匹配
             - 执行引擎自动注入参数值
             - 支持类型标注（如 pd.DataFrame, str, int 等）
-        
+
         返回值绑定机制：
             - 单个返回值：自动绑定到第一个 outputVariable
             - 多个返回值（Tuple）：按位置顺序绑定
             - Dict 返回值：按 key 匹配 outputVariables[].name
-        
+
         示例：
             def process(self, data: pd.DataFrame) -> pd.DataFrame:
                 # 特征工程处理
@@ -97,11 +97,11 @@ TaskDefinition:
   namespace: "com.company.models"
   name: "用户评分模型推理"
   type: "model_inference"
-  
+
   versions:
     - version: "1.0.0"
       status: "PUBLISHED"
-      
+
       inputVariables:
         - name: "user_data_path"
           type: "string"
@@ -109,7 +109,7 @@ TaskDefinition:
         - name: "output_path"
           type: "string"
           description: "评分结果输出路径"
-      
+
       outputVariables:
         - name: "inference_count"
           type: "integer"
@@ -117,40 +117,40 @@ TaskDefinition:
         - name: "output_path"
           type: "string"
           description: "结果输出路径"
-      
+
       executionDefinition:
         modelLocation:
           type: "mlflow"
           url: "mlflow://models/user_scoring"
           version: "production"
-        
+
         featureEngineering:
           codeLocation:
             type: "git"
             url: "https://github.com/company/feature-ops.git"
             ref: "v2.1.0"
             path: "features/user_features.py"
-          
+
           operators:
             - name: "age_binning"
               class: "user_features.AgeBinning"
               config:
                 bins: [0, 18, 30, 45, 60, 100]
                 labels: ["teen", "young", "middle", "senior", "elder"]
-            
+
             - name: "behavior_aggregation"
               class: "user_features.BehaviorAggregation"
               config:
                 window_days: 30
                 metrics: ["click_count", "purchase_count", "avg_session_time"]
-        
+
         inferenceConfig:
           batchSize: 1000
           framework: "pytorch"
           deviceType: "gpu"
           preprocessor: "user_features.Normalizer"
           postprocessor: "user_features.ScoreCalibration"
-      
+
       resources:
         cpu: "8"
         memory: "32Gi"

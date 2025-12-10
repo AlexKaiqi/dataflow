@@ -2,7 +2,7 @@ description = 'Adapter module - External interfaces (REST API, RPC, MQ, etc.)'
 
 dependencies {
     implementation project(':dataflow-app')
-    
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'com.alibaba.cola:cola-component-dto'

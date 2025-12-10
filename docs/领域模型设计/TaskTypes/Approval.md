@@ -30,14 +30,14 @@ TaskDefinition:
   name: "quality_check_approval"
   version: "1.0.0"
   type: "approval"
-  
+
   # 审批配置
   executionDefinition:
     approvers: string[]           # 审批人列表
     description: string           # 审批说明
     timeout: integer              # 超时时间（秒）
     approvalUI: object            # 审批界面配置（可选）
-  
+
   # 输入变量（审批时可查看的数据）
   inputVariables:
     - name: data_summary
@@ -46,7 +46,7 @@ TaskDefinition:
     - name: quality_metrics
       type: object
       required: true
-  
+
   # 输出变量（审批结果）
   outputVariables:
     - name: status
@@ -67,17 +67,17 @@ executionDefinition:
   approvers:
     - "user1@example.com"
     - "user2@example.com"
-  
+
   # 审批说明（显示在审批界面）
   description: |
     请审核数据清洗结果：
     - 检查数据质量指标
     - 验证空值率是否符合要求
     - 确认数据分布是否正常
-  
+
   # 超时时间（秒）
   timeout: 86400  # 24小时
-  
+
   # 审批界面配置（可选）
   approvalUI:
     title: "数据质量审核"
@@ -176,7 +176,7 @@ nodes:
       name: "clean_user_data"
       version: "1.0.0"
     startWhen: "cron:0 2 * * *"
-  
+
   # 质量审核
   - alias: "quality_check"
     taskRef:
@@ -191,7 +191,7 @@ nodes:
       quality_metrics:
         type: "reference"
         source: "data_cleaning.output.metrics"
-  
+
   # 审批通过分支
   - alias: "load_to_warehouse"
     taskRef:
@@ -203,7 +203,7 @@ nodes:
       data_path:
         type: "reference"
         source: "data_cleaning.output.path"
-  
+
   # 审批拒绝分支
   - alias: "notify_failure"
     taskRef:
@@ -364,7 +364,7 @@ GET /api/v1/executions/{executionId}
 executionDefinition:
   approvers: ["reviewer@example.com"]
   timeout: 86400  # 24小时超时
-  
+
 # 超时后触发告警或默认操作
 - alias: "handle_timeout"
   startWhen: "event:quality_check.timeout"

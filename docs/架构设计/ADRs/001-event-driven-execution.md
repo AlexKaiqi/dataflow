@@ -1,7 +1,7 @@
 # ADR-001: 事件驱动执行模型
 
-> **状态**: 已采纳  
-> **决策日期**: 2025-12-08  
+> **状态**: 已采纳
+> **决策日期**: 2025-12-08
 > **影响范围**: 执行引擎、编排逻辑、依赖管理
 
 ---
@@ -53,7 +53,7 @@ nodes:
   - id: upstream
     taskRef: process_data
     startWhen: "event:pipeline.started"
-  
+
   - id: downstream
     taskRef: analyze_result
     startWhen: "event:upstream.completed && {{ upstream.row_count > 0 }}"
@@ -110,17 +110,17 @@ nodes:
   - id: quality_check
     taskRef: check_data_quality
     startWhen: "event:load_data.completed"
-  
+
   # 高质量路径 - 直接入库
   - id: direct_ingest
     taskRef: ingest_to_warehouse
     startWhen: "event:quality_check.completed && {{ quality_check.score > 0.9 }}"
-  
+
   # 低质量路径 - 人工审批
   - id: manual_review
     taskRef: approval_task
     startWhen: "event:quality_check.completed && {{ quality_check.score <= 0.9 }}"
-  
+
   # 审批通过后入库
   - id: approved_ingest
     taskRef: ingest_to_warehouse
@@ -168,20 +168,20 @@ nodes:
   - id: source_a
     taskRef: load_from_hdfs
     startWhen: "event:pipeline.started"
-  
+
   - id: source_b
     taskRef: load_from_iceberg
     startWhen: "event:pipeline.started"
-  
+
   - id: source_c
     taskRef: load_from_kafka
     startWhen: "event:pipeline.started"
-  
+
   # OR 汇聚 - 任意一个完成即可
   - id: merge
     taskRef: merge_data
     startWhen: "event:source_a.completed || event:source_b.completed || event:source_c.completed"
-  
+
   # 更复杂的汇聚 - 至少 2 个成功
   - id: quality_merge
     taskRef: merge_data
@@ -283,12 +283,12 @@ nodes:
     taskRef: approval_task
     startWhen: "event:quality_check.completed && {{ quality_check.score < 0.8 }}"
     timeout: 24h  # 任务定义中声明超时时间
-  
+
   # 审批通过路径
   - id: approved_ingest
     taskRef: ingest_to_warehouse
     startWhen: "event:manual_approval.approved"
-  
+
   # 审批拒绝或超时路径
   - id: rejected_handling
     taskRef: downgrade_process
@@ -469,15 +469,15 @@ nodes:
     taskRef: spark_batch_job
     startWhen: "event:load_data.completed"
     retryWhen: |
-      event:process_data.failed && 
+      event:process_data.failed &&
       {{ process_data.error_type in ['NetworkError', 'TimeoutError'] }} &&
       {{ process_data.retry_count < 3 }}
-  
+
   # 数据错误时触发人工介入
   - id: manual_fix
     taskRef: approval_task
     startWhen: |
-      event:process_data.failed && 
+      event:process_data.failed &&
       {{ process_data.error_type == 'DataValidationError' }}
 ```
 
@@ -713,7 +713,7 @@ streaming_task = BashOperator(
 **Airflow 的假设**: 所有任务最终会结束
 **流处理的现实**: 任务可能永久运行
 
-**变通方案**: 
+**变通方案**:
 - 使用 `ShortCircuitOperator` 提前终止 DAG
 - 使用外部调度器(如 Kubernetes CronJob)管理流任务
 
@@ -746,7 +746,7 @@ class DagRun:
     dag_id: str
     execution_date: datetime  # 核心: 每个 Run 对应一个时间点
     state: str
-    
+
 class TaskInstance:
     dag_id: str
     task_id: str
@@ -822,7 +822,7 @@ def my_flow():
 func MyWorkflow(ctx workflow.Context) error {
     // ✅ 支持长时间等待
     workflow.Sleep(ctx, 24 * time.Hour)
-    
+
     // ✅ 支持外部信号
     var signal string
     workflow.GetSignalChannel(ctx, "approval").Receive(ctx, &signal)
@@ -940,6 +940,6 @@ func MyWorkflow(ctx workflow.Context) error {
 
 ---
 
-**版本**: v1.0  
-**最后更新**: 2025-12-08  
+**版本**: v1.0
+**最后更新**: 2025-12-08
 **作者**: 架构设计组

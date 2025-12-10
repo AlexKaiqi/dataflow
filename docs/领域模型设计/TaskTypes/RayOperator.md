@@ -36,7 +36,7 @@ inputVariables:
     type: string
     required: true
     description: "输入数据路径，支持多种数据源（HDFS、S3、本地文件等）"
-    
+
   - name: output_path
     type: string
     required: true
@@ -50,15 +50,15 @@ outputVariables:
   - name: output_path
     type: string
     description: "实际输出路径"
-    
+
   - name: rows_input
     type: number
     description: "输入数据行数"
-    
+
   - name: rows_output
     type: number
     description: "输出数据行数（经过所有算子处理后）"
-    
+
   - name: execution_time
     type: number
     description: "总执行时间（秒）"
@@ -81,24 +81,24 @@ outputVariables:
 executionConfig:
   # 算子框架（可选，默认为 datajuicer）
   framework: "datajuicer"         # datajuicer | custom | other
-  
+
   # 算子处理链（按顺序执行）
   operators:
     - type: "filter"              # 算子类型
       config:                     # 算子配置
         columns: ["text", "label"]
-        
+
     - type: "map"
       config:
         column: "text"
         lowercase: true
         remove_punctuation: true
-        
+
     - type: "dedup"
       config:
         columns: ["text"]
         method: "exact"
-  
+
   # 资源配置
   resources:
     cpu: 4
@@ -134,10 +134,10 @@ type: "filter"
 config:
   # 基于列值过滤
   columns: ["text", "label"]           # 必须非空的列
-  
+
   # 基于条件表达式
   condition: "length(text) > 10"       # 条件表达式
-  
+
   # 基于质量分数
   min_quality_score: 0.8
 ```
@@ -150,12 +150,12 @@ config:
 type: "map"
 config:
   column: "text"                       # 要转换的列
-  
+
   # 文本处理
   lowercase: true                      # 转小写
   remove_punctuation: true             # 移除标点
   remove_stopwords: true               # 移除停用词
-  
+
   # 自定义函数
   function: "lambda x: x.strip()"      # Python lambda 函数
 ```
@@ -239,7 +239,7 @@ executionConfig:
       name: "remove_nulls"
       config:
         columns: ["text", "label"]
-    
+
     # 2. 文本规范化
     - type: "map"
       name: "normalize_text"
@@ -248,7 +248,7 @@ executionConfig:
         lowercase: true
         remove_punctuation: true
         remove_stopwords: true
-    
+
     # 3. 去重
     - type: "dedup"
       name: "deduplicate"
@@ -256,13 +256,13 @@ executionConfig:
         columns: ["text"]
         method: "fuzzy"
         threshold: 0.95
-    
+
     # 4. 长度过滤
     - type: "filter"
       name: "length_filter"
       config:
         condition: "length(text) >= 10 and length(text) <= 1000"
-    
+
     # 5. 采样（可选）
     - type: "sample"
       name: "downsample"
@@ -270,11 +270,11 @@ executionConfig:
         rate: 0.8
         method: "random"
         seed: 42
-  
+
   resources:
     cpu: 8
     memory: "16G"
-  
+
   batch_size: 5000
 ```
 
@@ -295,7 +295,7 @@ executionConfig:
         source_format: "jsonl"
         target_format: "parquet"
         compression: "snappy"
-    
+
     # 2. 数据验证
     - type: "filter"
       name: "validate_schema"
@@ -352,7 +352,7 @@ executionConfig:
   # 启用并行处理
   num_workers: 8
   batch_size: 1000
-  
+
   # 内存优化
   cache_compressed: true
   memory_fraction: 0.8

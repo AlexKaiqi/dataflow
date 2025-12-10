@@ -21,4 +21,4 @@ mybatis-plus:
 
 logging:
   level:
-    com.tencent.dataflow: DEBUG
+    '[com.tencent.dataflow]': DEBUG

@@ -2,11 +2,21 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.8' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
+    id 'checkstyle'
+    id 'pmd'
+    id 'com.github.spotbugs' version '6.0.26' apply false
+    id 'org.owasp.dependencycheck' version '11.1.1'
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'com.tencent'
 version = '1.0.0-SNAPSHOT'
 description = 'Dataflow - Data Pipeline Orchestration Platform'
+
+// 根项目也需要配置仓库（用于代码质量检查工具的依赖）
+repositories {
+    mavenCentral()
+}
 
 ext {
     set('springBootVersion', '3.5.8')
@@ -43,7 +53,7 @@ subprojects {
     dependencies {
         compileOnly 'org.projectlombok:lombok'
         annotationProcessor 'org.projectlombok:lombok'
-        
+
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'junit:junit:4.13.2'
         testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -51,5 +61,154 @@ subprojects {
 
     tasks.named('test') {
         useJUnitPlatform()
+    }
+}
+
+// ==================== 代码质量检查配置 ====================
+
+// Spotless - 代码格式化
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat('1.19.2')
+            .aosp()  // 使用 AOSP 风格（4空格缩进）
+            .reflowLongStrings()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+
+        // 自定义格式化规则
+        custom 'noWildcardImports', {
+            if (it.contains('*;')) {
+                throw new AssertionError('不允许使用通配符导入')
+            }
+        }
+    }
+
+    format 'misc', {
+        target '**/*.gradle', '**/*.md', '**/.gitignore'
+        trimTrailingWhitespace()
+        indentWithSpaces(4)
+        endWithNewline()
+    }
+}
+
+// Checkstyle - 代码风格检查
+allprojects {
+    apply plugin: 'checkstyle'
+
+    checkstyle {
+        toolVersion = '10.18.2'
+        configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+        ignoreFailures = true  // 初期设置为警告，不中断构建
+        maxWarnings = 100      // 允许一定数量的警告
+        showViolations = true
+    }
+
+    tasks.withType(Checkstyle) {
+        reports {
+            xml.required = true
+            html.required = true
+        }
+    }
+}
+
+// PMD - 代码质量检查
+allprojects {
+    apply plugin: 'pmd'
+
+    pmd {
+        toolVersion = '7.7.0'
+        consoleOutput = true
+        ignoreFailures = true  // 初期设置为警告，不中断构建
+        ruleSetFiles = files(rootProject.file('config/pmd/ruleset.xml'))
+        ruleSets = []  // 使用自定义规则集
+    }
+
+    tasks.withType(Pmd) {
+        reports {
+            xml.required = true
+            html.required = true
+        }
+    }
+}
+
+// SpotBugs - 静态代码分析（查找潜在 bug）
+subprojects {
+    apply plugin: 'com.github.spotbugs'
+
+    spotbugs {
+        toolVersion = '4.8.6'
+        effort = 'max'
+        reportLevel = 'low'
+        ignoreFailures = true  // 初期设置为警告，不中断构建
+    }
+
+    tasks.withType(com.github.spotbugs.snom.SpotBugsTask) {
+        reports {
+            xml.required = true
+            html.required = true
+        }
+    }
+
+    dependencies {
+        spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.13.0'
+    }
+}
+
+// OWASP Dependency Check - 依赖安全漏洞扫描
+dependencyCheck {
+    formats = ['HTML', 'JSON']
+    failBuildOnCVSS = 7  // CVSS 评分 >= 7 时构建失败
+    suppressionFile = 'config/dependency-check/suppressions.xml'
+
+    analyzers {
+        assemblyEnabled = false
+        nuspecEnabled = false
+    }
+
+    // 跳过测试依赖的扫描
+    skipConfigurations = ['testCompileClasspath', 'testRuntimeClasspath']
+}
+
+// ==================== 自定义任务 ====================
+
+// 代码格式化任务
+task formatCode {
+    group = 'formatting'
+    description = '自动格式化所有代码'
+    dependsOn spotlessApply
+}
+
+// 代码质量检查总任务（根项目）
+task codeQuality {
+    group = 'verification'
+    description = '运行所有代码质量检查（格式、风格、质量）'
+    dependsOn spotlessCheck, checkstyleMain, pmdMain
+}
+
+// 完整验证任务（包含测试和质量检查）
+task fullVerify {
+    group = 'verification'
+    description = '运行测试和所有代码质量检查（包括安全扫描）'
+    dependsOn codeQuality, dependencyCheckAnalyze
+
+    subprojects.each { subproject ->
+        dependsOn "${subproject.path}:test"
+    }
+}
+
+// 配置子项目的代码质量任务
+subprojects {
+    // 每个子项目的代码质量检查
+    task codeQuality {
+        group = 'verification'
+        description = '运行当前模块的代码质量检查'
+        dependsOn checkstyleMain, pmdMain, spotbugsMain
+    }
+
+    // 在构建前运行代码质量检查
+    tasks.named('build') {
+        dependsOn codeQuality
     }
 }

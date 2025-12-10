@@ -34,22 +34,22 @@ TaskDefinition:
   name: string                   # 任务名称，如 "data_transform"
   version: string                # 版本号（见版本管理说明）
   # 复合键 namespace:name:version 全局唯一
-  
+
   # 基本信息
   type: TaskType                 # 任务类型（见下文）
   description: string            # 任务描述
-  
+
   # 接口契约
   inputVariables: List[VariableDefinition]   # 输入变量定义
   outputVariables: List[VariableDefinition]  # 输出变量定义
-  
+
   # 行为定义
   supportedActions: List[Action]  # 支持的行为（由 type 决定）
   outputEvents: List[Event]       # 产生的事件（由 type 决定）
-  
+
   # 执行定义（类型特定）
   executionConfig: object         # 根据 type 不同而不同
-  
+
   # 元数据
   createdAt: timestamp
   createdBy: string
@@ -152,7 +152,7 @@ inputVariables:
     type: string                       # 数据类型
     required: true                     # 是否必填
     description: "输入数据路径"
-  
+
   - name: quality_threshold
     type: number
     required: false
@@ -169,11 +169,11 @@ outputVariables:
   - name: rows_processed
     type: integer                      # 数据类型
     description: "处理的数据行数"
-  
+
   - name: quality_score
     type: number
     description: "数据质量分数"
-  
+
   - name: output_path
     type: string
     description: "输出数据路径"
@@ -223,17 +223,17 @@ pipeline:
     - id: data_processing
       taskDefinition: spark_etl_v1
       startWhen: "event:pipeline.started"        # 订阅 Pipeline 启动事件
-  
+
     - id: quality_check
       taskDefinition: quality_validator_v1
       # 等待上游完成事件 + 检查输出变量
       startWhen: "event:data_processing.completed && {{ data_processing.quality_score > 0.9 }}"
-  
+
     - id: manual_review
       taskDefinition: approval_task_v1
       # 质量不达标时需要人工审批
       startWhen: "event:data_processing.completed && {{ data_processing.quality_score <= 0.9 }}"
-  
+
     - id: deploy
       taskDefinition: deploy_task_v1
       # 两条路径：质量达标或审批通过（事件汇聚）

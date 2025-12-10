@@ -7,7 +7,7 @@ description = 'Application module - Business logic and use cases'
 dependencies {
     api project(':dataflow-client')
     api project(':dataflow-domain')
-    
+
     implementation 'com.alibaba.cola:cola-component-dto'
     implementation 'com.alibaba.cola:cola-component-exception'
     implementation 'org.springframework.boot:spring-boot-starter'

@@ -19,22 +19,22 @@ PipelineDefinition:
   id: string                           # Pipeline ID，全局唯一
   namespace: string                    # 命名空间，如 "com.company.pipelines"
   name: string                         # Pipeline 名称
-  
+
   # 版本管理
   versions: PipelineVersion[]
     - version: string                  # 版本号："draft" | "1.0.0" | "1.1.0"
       status: enum                     # "DRAFT" | "PUBLISHED"
-  
+
       # Pipeline 输入/输出接口
       inputVariables: VariableDefinition[]   # Pipeline 的输入参数
       outputVariables: VariableDefinition[]  # Pipeline 的输出结果
-  
+
       # 节点列表（唯一的编排结构）
       nodes: Node[]                    # 节点（Node）：流水线的编排单元，代表工作流中的一个执行点
         # 节点标识
         - id: string                   # 节点 ID，在当前 Pipeline 版本内唯一，用于引用和定位
                                        # 建议使用有意义的名称，如 "extract_user_data"
-  
+
           # 节点类型与引用
           type: enum                   # "task" | "pipeline"
           taskDefinition?: TaskDefinitionRef      # type=task 时使用
@@ -42,7 +42,7 @@ PipelineDefinition:
             inline?: TaskDefinition    # 或内联定义（仅用于当前 Pipeline）
           pipelineDefinition?: PipelineDefinitionRef  # type=pipeline 时使用（子流水线）
             ref: string                # 引用已发布的 PipelineDefinition："namespace:name:version"
-  
+
           # 输入绑定：将定义的 inputVariables 绑定到具体值
           inputBindings: Map[string, Expression]
             # key: 输入变量名（来自 TaskDefinition 或 PipelineDefinition）
@@ -51,7 +51,7 @@ PipelineDefinition:
             #   - Pipeline 输入：{{ pipeline.input.param_name }}
             #   - 常量值：直接值（字符串、数字、布尔等）
             #   - 计算表达式：{{ node_a.count + node_b.count }}
-  
+
           # 执行控制表达式：定义节点行为触发时机
           startWhen: Expression        # 何时启动（必填）
             # 示例：
@@ -63,22 +63,22 @@ PipelineDefinition:
           startMode: enum?             # 触发模式："once" | "repeat"（默认 once）
             # once: 触发一次后取消订阅（批处理任务默认）
             # repeat: 保持订阅持续触发（周期性任务、流处理）
-    
+
           stopWhen: Expression?        # 何时停止（仅 streaming 类型任务）
             # 示例："event:manual.stop || {{ error_rate > 0.1 }}"
-    
+
           restartWhen: Expression?     # 何时重启（仅 streaming 类型任务）
             # 示例："event:config_updated.triggered"
-    
+
           retryWhen: Expression?       # 何时重试（批处理任务，不适用于 approval）
             # 示例："event:task.failed && {{ attempts < 3 }}"
-    
+
           alertWhen: Expression?       # 何时告警（不影响任务执行）
             # 示例："cron:*/5 * * * * && {{ execution_time > 3600 }}"      # 版本元数据
       releaseNotes: string             # 发布说明
       createdAt: Timestamp
       createdBy: string                # 仅 PUBLISHED 版本有值
-  
+
   # Pipeline 元数据
   metadata:
     owners: string[]                   # 所有者列表
@@ -340,7 +340,7 @@ nodes:
     inputBindings:
       source: "{{ pipeline.input.source_table }}"
     startWhen: "event:pipeline.started"
-  
+
   # 依赖节点:订阅 extract.completed 事件
   - id: transform_data
     taskDefinition:
@@ -348,7 +348,7 @@ nodes:
     inputBindings:
       input_path: "{{ extract_source_data.output_path }}"
     startWhen: "event:extract_source_data.completed"
-  
+
   # Join 节点:订阅多个上游事件
   - id: merge_results
     taskDefinition:
@@ -357,7 +357,7 @@ nodes:
       path_a: "{{ branch_a.output_path }}"
       path_b: "{{ branch_b.output_path }}"
     startWhen: "event:branch_a.completed && event:branch_b.completed"
-  
+
   # 条件分支:高质量路径
   - id: publish_high_quality_data
     taskDefinition:
@@ -365,7 +365,7 @@ nodes:
     inputBindings:
       data_path: "{{ check_data_quality.output_path }}"
     startWhen: "event:check_data_quality.completed && {{ check_data_quality.score > 0.9 }}"
-  
+
   # 条件分支:低质量需要审批
   - id: approve_low_quality_data
     taskDefinition:
@@ -387,12 +387,12 @@ inputVariables:
     type: string
     required: true
     description: "源表名称"
-  
+
   - name: target_date
     type: string
     required: true
     description: "目标日期，格式 YYYY-MM-DD"
-  
+
   - name: quality_threshold
     type: number
     required: false
@@ -407,11 +407,11 @@ outputVariables:
   - name: output_path
     type: string
     description: "处理后的数据路径"
-  
+
   - name: row_count
     type: integer
     description: "处理的数据行数"
-  
+
   - name: quality_score
     type: number
     description: "数据质量评分"
@@ -439,7 +439,7 @@ versions:
     status: "DRAFT"
     nodes: [...]
     inputVariables: [...]
-  
+
   - version: "1.0.0"
     status: "PUBLISHED"
     nodes: [...]
@@ -457,11 +457,11 @@ PipelineDefinition:
   id: "pipe_123"
   namespace: "com.company.pipelines"
   name: "user_data_etl"
-  
+
   versions:
     - version: "1.0.0"
       status: "PUBLISHED"
-  
+
       # Pipeline 输入
       inputVariables:
         - name: source_table
@@ -473,7 +473,7 @@ PipelineDefinition:
         - name: quality_threshold
           type: number
           defaultValue: 0.9
-  
+
       # Pipeline 输出
       outputVariables:
         - name: output_path
@@ -482,7 +482,7 @@ PipelineDefinition:
           type: integer
         - name: final_quality_score
           type: number
-  
+
       # 节点编排
       nodes:
         # 1. 数据提取
@@ -494,7 +494,7 @@ PipelineDefinition:
             table_name: "{{ pipeline.input.source_table }}"
             partition_date: "{{ pipeline.input.target_date }}"
           startWhen: "event:pipeline.started"
-  
+
         # 2. 数据转换
         - id: transform_data
           type: task
@@ -504,7 +504,7 @@ PipelineDefinition:
             input_path: "{{ extract_source_data.output_path }}"
           startWhen: "event:extract_source_data.completed"
           retryWhen: "{{ attempts < 3 }}"
-  
+
         # 3. 质量检查
         - id: check_data_quality
           type: task
@@ -514,7 +514,7 @@ PipelineDefinition:
             data_path: "{{ transform_data.output_path }}"
             threshold: "{{ pipeline.input.quality_threshold }}"
           startWhen: "event:transform_data.completed"
-  
+
         # 4a. 高质量路径：直接发布
         - id: publish_high_quality_data
           type: task
@@ -523,7 +523,7 @@ PipelineDefinition:
           inputBindings:
             data_path: "{{ transform_data.output_path }}"
           startWhen: "event:check_data_quality.completed && {{ check_data_quality.score > 0.9 }}"
-  
+
         # 4b. 低质量路径：需要审批
         - id: approve_low_quality_data
           type: task
@@ -534,7 +534,7 @@ PipelineDefinition:
             description: "质量评分: {{ check_data_quality.score }}"
             approvers: ["admin@company.com"]
           startWhen: "event:check_data_quality.completed && {{ check_data_quality.score <= 0.9 }}"
-  
+
         # 5. 汇聚：两条路径都完成后发送通知
         - id: send_completion_notification
           type: task
@@ -543,7 +543,7 @@ PipelineDefinition:
           inputBindings:
             message: "Pipeline 执行完成"
           startWhen: "event:publish_high_quality_data.completed || event:approve_low_quality_data.approved"
-  
+
       releaseNotes: "Initial release with quality check and approval"
       createdAt: "2024-01-01T00:00:00Z"
       createdBy: "user@company.com"
@@ -772,4 +772,3 @@ Node A                         Node B
 ```
 
 这种设计实现了**关注点分离**：数据流（需要什么）与控制流（何时触发）独立表达，提供更强的灵活性和可扩展性。
-

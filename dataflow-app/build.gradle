@@ -14,4 +14,8 @@ dependencies {
     implementation 'org.springframework:spring-context'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'org.springframework:spring-web'
+
+    testImplementation project(':dataflow-infrastructure')
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

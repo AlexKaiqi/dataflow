@@ -71,6 +71,34 @@ public class Node {
      * 自定义元数据
      */
     private Map<String, Object> metadata;
+
+    /**
+     * 节点当前状态 (e.g., "running", "succeeded", "failed")
+     * <p>
+     * 由 ControlPlane 根据事件更新。
+     * </p>
+     */
+    private String status;
+
+    /**
+     * 节点输出数据
+     * <p>
+     * 任务执行完成后产生的输出。
+     * </p>
+     */
+    private Map<String, Object> outputs;
+
+    public boolean isSucceeded() {
+        return "succeeded".equalsIgnoreCase(status);
+    }
+
+    public boolean isFailed() {
+        return "failed".equalsIgnoreCase(status);
+    }
+
+    public boolean isRunning() {
+        return "running".equalsIgnoreCase(status);
+    }
     
     /**
      * 校验节点配置有效性

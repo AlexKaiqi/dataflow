@@ -37,27 +37,49 @@ public class ControlPlaneServiceImpl implements ControlPlaneService {
     @Override
     public void onEvent(Event event) {
         log.info("Received event: {}", event.getType());
-        // 1. Find affected nodes (Simplified: find all for demo)
+        
         List<Node> nodes = nodeRepository.findAllActiveNodes();
         
+        // 0. Update state of the source node based on event
+        updateNodeState(nodes, event);
+
+        // 1. Find affected nodes (Simplified: find all for demo)
         for (Node node : nodes) {
             try {
                 // 1. Evaluate Control Policy (Running nodes)
-                evaluateNodePolicy(node, event);
+                evaluateNodePolicy(node, event, nodes);
                 
                 // 2. Evaluate Start Condition (Waiting nodes)
-                evaluateStartCondition(node, event);
+                evaluateStartCondition(node, event, nodes);
             } catch (Exception e) {
                 log.error("Failed to evaluate policy for node {}", node.getId(), e);
             }
         }
     }
 
-    private void evaluateStartCondition(Node node, Event event) {
+    private void updateNodeState(List<Node> nodes, Event event) {
+        if (event.getSource() == null) return;
+        for (Node node : nodes) {
+            // Simplified matching: assumes source ends with /nodes/{nodeId}
+            if (event.getSource().endsWith("/nodes/" + node.getId())) {
+                node.setStatus(event.getType());
+                node.setOutputs(event.getPayload());
+                nodeRepository.save(node);
+                log.info("Updated node [{}] status to [{}]", node.getId(), node.getStatus());
+            }
+        }
+    }
+
+    private void evaluateStartCondition(Node node, Event event, List<Node> allNodes) {
+        // Prevent starting if already running or completed
+        if (node.isRunning() || node.isSucceeded()) {
+            return;
+        }
+
         String startWhen = node.getStartWhen();
         if (startWhen == null || startWhen.isBlank()) return;
 
-        StandardEvaluationContext context = createEvaluationContext(node, event);
+        StandardEvaluationContext context = createEvaluationContext(node, event, allNodes);
 
         if (evaluate(startWhen, context)) {
             Map<String, Object> params = resolveParams(node.getStartPayload(), context);
@@ -66,11 +88,21 @@ public class ControlPlaneServiceImpl implements ControlPlaneService {
     }
 
     @NonNull
-    private StandardEvaluationContext createEvaluationContext(Node node, Event event) {
+    private StandardEvaluationContext createEvaluationContext(Node node, Event event, List<Node> allNodes) {
         StandardEvaluationContext context = new StandardEvaluationContext();
         Map<String, Object> root = new HashMap<>();
         root.put("event", event);
         root.put("node", node);
+        
+        // Inject all nodes into context with sanitized IDs (e.g., sql-node -> sql_node)
+        if (allNodes != null) {
+            for (Node n : allNodes) {
+                String safeId = n.getId().replace("-", "_");
+                root.put(safeId, n);
+                context.setVariable(safeId, n);
+            }
+        }
+
         context.setRootObject(root);
         context.setVariable("event", event);
         context.setVariable("node", node);
@@ -79,10 +111,18 @@ public class ControlPlaneServiceImpl implements ControlPlaneService {
 
     @Override
     public void evaluateNodePolicy(Node node, Event event) {
+        // Delegate to the new method with empty list if called directly (backward compatibility if needed)
+        // But since this is an interface method, I should probably update the interface or keep this one.
+        // For now, I'll just call findAllActiveNodes here if needed, but better to update the flow.
+        // Wait, evaluateNodePolicy is in the interface?
+        evaluateNodePolicy(node, event, nodeRepository.findAllActiveNodes());
+    }
+
+    public void evaluateNodePolicy(Node node, Event event, List<Node> allNodes) {
         ControlPolicy policy = node.getControlPolicy();
         if (policy == null) return;
 
-        StandardEvaluationContext context = createEvaluationContext(node, event);
+        StandardEvaluationContext context = createEvaluationContext(node, event, allNodes);
 
         // 1. Evaluate Standard Policies
         if (evaluate(policy.getStopWhen(), context)) {

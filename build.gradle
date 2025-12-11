@@ -85,9 +85,14 @@ spotless {
 
         // 自定义格式化规则
         custom 'noWildcardImports', {
-            if (it.contains('*;')) {
-                throw new AssertionError('不允许使用通配符导入')
+            if (it.contains('import java.util.*;')) {
+                // 允许 java.util.*，因为太常用了
+                return it
             }
+            if (it.contains('*;')) {
+                throw new AssertionError('不允许使用通配符导入: ' + it)
+            }
+            return it
         }
     }
 

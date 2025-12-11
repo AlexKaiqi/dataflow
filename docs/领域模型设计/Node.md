@@ -30,8 +30,22 @@ Node:
 
   # ==== 3. 启动机制 (Trigger) ====
   startWhen: string                         # 启动条件表达式 (SpEL)
-                                            # 示例: "event.type == 'pipeline.started'"
-                                            # 示例: "event.type == 'task.succeeded' && event.source == 'node_A'"
+                                            # 上下文变量:
+                                            # 1. event: 当前触发事件 (Event对象)
+                                            #    - event.type: 事件类型 (如 'task.succeeded')
+                                            #    - event.source: 事件源
+                                            #    - event.payload: 事件负载
+                                            # 2. {nodeId}: 直接通过节点ID访问该节点对象 (NodeStateWrapper)
+                                            #    - {nodeId}.status: 节点状态 (如 'RUNNING', 'SUCCEEDED')
+                                            #    - {nodeId}.succeeded: 快捷判断 status == 'SUCCEEDED'
+                                            #    - {nodeId}.failed: 快捷判断 status == 'FAILED'
+                                            #    - {nodeId}.outputs: 节点输出数据 (Map)
+                                            #                        [来源] 上游任务成功事件(task.succeeded)的 payload.outputs
+                                            # 3. pipeline: 流水线全局信息
+
+                                            # 示例 1 (依赖状态): "node_A.succeeded && node_B.succeeded"
+                                            # 示例 2 (依赖输出): "approval_node.outputs['result'] == 'pass'"
+                                            # 示例 3 (混合): "event.type == 'signal' && node_A.succeeded"
 
   startPayload: Map<String, String>         # 启动参数映射
                                             # Key: 任务输入参数名
@@ -67,10 +81,14 @@ Node:
 
 定义节点何时被实例化并执行。
 - **类型**: SpEL 表达式 (String)
-- **上下文**: `event` (触发事件)
+- **上下文**:
+    - `event`: 当前触发评估的事件对象。
+    - `{nodeId}`: 动态注入所有节点的状态包装器。
 - **示例**:
-  - 串行依赖: `event.type == 'task.succeeded' && event.source == 'prev_node'`
-  - 并行汇聚: `services.stateStore.isCompleted('node_A') && services.stateStore.isCompleted('node_B')` (需结合状态服务)
+  - **串行依赖**: `prev_node.succeeded`
+  - **并行汇聚**: `node_A.succeeded && node_B.succeeded`
+  - **条件分支**: `approval_node.succeeded && approval_node.outputs['decision'] == 'approve'`
+  - **事件驱动**: `event.type == 'external.signal' && event.payload.code == 200`
 
 #### 2. startPayload (输入映射)
 

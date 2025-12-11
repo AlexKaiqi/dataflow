@@ -15,6 +15,7 @@ import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -64,6 +65,7 @@ public class ControlPlaneServiceImpl implements ControlPlaneService {
         }
     }
 
+    @NonNull
     private StandardEvaluationContext createEvaluationContext(Node node, Event event) {
         StandardEvaluationContext context = new StandardEvaluationContext();
         Map<String, Object> root = new HashMap<>();
@@ -104,7 +106,7 @@ public class ControlPlaneServiceImpl implements ControlPlaneService {
         }
     }
 
-    private boolean evaluate(String expressionStr, StandardEvaluationContext context) {
+    private boolean evaluate(String expressionStr, @NonNull StandardEvaluationContext context) {
         if (expressionStr == null || expressionStr.isBlank()) return false;
         try {
             Expression exp = parser.parseExpression(expressionStr);
@@ -116,13 +118,15 @@ public class ControlPlaneServiceImpl implements ControlPlaneService {
         }
     }
 
-    private Map<String, Object> resolveParams(Map<String, String> paramExprs, StandardEvaluationContext context) {
+    private Map<String, Object> resolveParams(Map<String, String> paramExprs, @NonNull StandardEvaluationContext context) {
         Map<String, Object> params = new HashMap<>();
         if (paramExprs == null) return params;
         
         for (Map.Entry<String, String> entry : paramExprs.entrySet()) {
+            String expr = entry.getValue();
+            if (expr == null) continue;
             try {
-                Expression exp = parser.parseExpression(entry.getValue());
+                Expression exp = parser.parseExpression(expr);
                 Object value = exp.getValue(context);
                 params.put(entry.getKey(), value);
             } catch (Exception e) {

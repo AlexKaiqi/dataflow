@@ -4,7 +4,6 @@ import com.tencent.dataflow.domain.event.Event;
 import com.tencent.dataflow.domain.executor.MockTaskExecutor;
 import com.tencent.dataflow.domain.node.Node;
 import com.tencent.dataflow.domain.node.TaskConfig;
-import com.tencent.dataflow.domain.pipeline.Pipeline;
 import com.tencent.dataflow.domain.repository.NodeRepository;
 import com.tencent.dataflow.domain.service.impl.ControlPlaneServiceImpl;
 import com.tencent.dataflow.domain.taskschema.ActionDefinition;
@@ -58,11 +57,6 @@ class PipelineBatchTest {
                 .taskConfig(TaskConfig.builder().taskType("shell_script").build())
                 .startWhen("#event.source == '/pipelines/pipe-1/nodes/node-a' && #event.type == 'succeeded'")
                 .startPayload(Map.of("script", "'echo Hello from B, triggered by ' + #event.source"))
-                .build();
-
-        Pipeline pipeline = Pipeline.builder()
-                .id("pipe-1")
-                .nodes(List.of(nodeA, nodeB))
                 .build();
 
         // Store nodes

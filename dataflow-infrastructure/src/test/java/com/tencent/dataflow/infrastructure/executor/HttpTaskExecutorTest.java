@@ -15,6 +15,8 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
@@ -52,7 +54,7 @@ class HttpTaskExecutorTest {
 
         // Mock Server
         mockServer.expect(requestTo("http://example.com/api/start"))
-                .andExpect(method(HttpMethod.POST))
+                .andExpect(method(Objects.requireNonNull(HttpMethod.POST)))
                 .andRespond(withSuccess("job-123", MediaType.TEXT_PLAIN));
 
         // Execute
@@ -82,7 +84,7 @@ class HttpTaskExecutorTest {
 
         // Mock Server
         mockServer.expect(requestTo("http://example.com/api/status"))
-                .andExpect(method(HttpMethod.GET))
+                .andExpect(method(Objects.requireNonNull(HttpMethod.GET)))
                 .andRespond(withSuccess("{\"status\":\"RUNNING\"}", MediaType.APPLICATION_JSON));
 
         // Execute

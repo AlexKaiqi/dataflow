@@ -18,6 +18,12 @@ repositories {
     mavenCentral()
 }
 
+// 根项目通常不包含代码，清空源目录以避免 IDE 误报
+sourceSets {
+    main { java.srcDirs = []; resources.srcDirs = [] }
+    test { java.srcDirs = []; resources.srcDirs = [] }
+}
+
 ext {
     set('springBootVersion', '3.5.8')
     set('mybatisStarterVersion', '3.0.3')

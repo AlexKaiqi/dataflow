@@ -16,6 +16,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * HttpTaskExecutor - HTTP 任务执行器
@@ -50,7 +51,11 @@ public class HttpTaskExecutor implements TaskExecutor {
 
         try {
             // 默认期望返回 String，通常是 executionId 或简单的状态
-            ResponseEntity<String> response = restTemplate.exchange(url, method, request, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    Objects.requireNonNull(url, "URL must not be null"),
+                    Objects.requireNonNull(method, "HttpMethod must not be null"),
+                    request,
+                    String.class);
             return response.getBody();
         } catch (Exception e) {
             log.error("Failed to execute HTTP action [{}] for node [{}]", action.getName(), node.getId(), e);
@@ -70,7 +75,11 @@ public class HttpTaskExecutor implements TaskExecutor {
         log.debug("Fetching HTTP State: {} {} for Node {}", method, url, node.getId());
 
         try {
-            ResponseEntity<Object> response = restTemplate.exchange(url, method, null, Object.class);
+            ResponseEntity<Object> response = restTemplate.exchange(
+                    Objects.requireNonNull(url, "URL must not be null"),
+                    Objects.requireNonNull(method, "HttpMethod must not be null"),
+                    null,
+                    Object.class);
             return response.getBody();
         } catch (Exception e) {
             log.error("Failed to get HTTP state [{}] for node [{}]", state.getName(), node.getId(), e);
@@ -114,7 +123,7 @@ public class HttpTaskExecutor implements TaskExecutor {
         if (protocolConfig != null && protocolConfig.containsKey("method")) {
             Object methodObj = protocolConfig.get("method");
             if (methodObj instanceof String) {
-                return HttpMethod.valueOf(((String) methodObj).toUpperCase());
+                return HttpMethod.valueOf(Objects.requireNonNull(((String) methodObj).toUpperCase()));
             }
         }
         return defaultMethod;

@@ -1,3 +1,3 @@
 # Code Review 指南
 
-待补充
+repository增加简单参数校验

@@ -1,273 +1,84 @@
-# Dataflow - 事件驱动的数据处理编排平台
+# ControlFlow Orchestration Engine
 
-## 项目概述
+> **注意**: 本项目原名为 DataFlow，现更名为 **ControlFlow**，以更准确地反映其核心职责——**控制流编排**而非数据流传输。
 
-Dataflow 是一个**声明式、事件驱动**的数据处理编排平台，旨在简化 AI/ML 训练前的数据预处理工作流。通过 YAML 配置定义数据处理管线，自动编排任务执行，支持批处理、流处理和人工审批等多种任务类型。
+## 1. 项目简介
 
-### 核心价值
+**ControlFlow** 是一个基于 **事件驱动 (Event-Driven)** 和 **反应式控制 (Reactive Control)** 的下一代工作流编排引擎。
 
-- **声明式配置**：用 YAML 描述数据处理逻辑，无需编写复杂的分布式代码
-- **事件驱动**：基于事件的自动化任务触发和状态管理，无需轮询
-- **多模态支持**：统一处理文本、图像、视频等不同类型数据
-- **异构数据源**：抽象化访问 HDFS、Iceberg、MQ、Ceph 等多种存储
-- **灵活执行**：支持 PySpark、Ray 等执行引擎，自动选择最优方案
+与传统的工作流引擎（如 Airflow, DolphinScheduler）不同，ControlFlow 不仅仅关注任务的静态依赖（DAG），更关注任务在运行时的**动态控制**。它通过统一的**控制平面 (Control Plane)**，以标准化的方式管理批处理 (Batch)、流处理 (Streaming) 以及混合编排 (Hybrid) 场景。
 
-## 解决的问题
+### 核心理念
 
-### 目标用户
+*   **Control Flow over Data Flow**: 引擎只负责"什么时候启动/停止任务"（控制流），而不负责"数据怎么传输"（数据流）。数据通过外部存储（S3, HDFS, Kafka）流转，引擎只传递数据的引用（Payload）。
+*   **Reactive Control**: 任务不再是"发射后不管" (Fire-and-Forget)。引擎持续监听任务状态和外部事件，根据 **ControlPolicy** 动态做出决策（如 Stop, Restart, Scale, Skip）。
+*   **Event-Driven Architecture**: 所有状态变更皆事件。节点之间通过事件松耦合协作，支持复杂的触发逻辑（SpEL 表达式）。
 
-**数据工程师** - 需要为 AI/ML 团队准备训练数据，但不想深入学习分布式计算框架的复杂性。
+## 2. 核心特性
 
-### 核心痛点
+*   **混合编排 (Hybrid Orchestration)**: 在同一个 Pipeline 中无缝编排 Batch（有限流）和 Streaming（无限流）任务。
+*   **标准化抽象 (TaskSchema)**: 通过 TaskSchema 定义任务的"能力契约"（Actions, Events, States），实现对任意异构系统的统一纳管。
+*   **声明式控制 (ControlPolicy)**: 通过 SpEL 表达式声明任务的运行时行为（如 `stopWhen`, `restartWhen`, `retryWhen`）。
+*   **逻辑关联 (Correlation)**: 通过 `correlationId` 串联跨越多个物理执行周期（Execution）的业务逻辑。
 
-1. **复杂性高**：编写 Spark/Ray 代码需要深厚的分布式系统知识
-2. **重复劳动**：相似的数据处理逻辑需要反复编写
-3. **维护困难**：硬编码的数据源连接和执行参数难以管理
-4. **缺乏编排**：任务依赖、重试、监控需要大量胶水代码
-5. **多模态割裂**：文本和视频数据处理使用完全不同的工具链
+## 3. 典型应用场景
 
-### 业务场景
+### 场景 1：混合流批处理 (Hybrid Pipeline)
 
-#### 场景 1：文本数据批处理（NLP 训练数据准备）
+上游批处理任务完成后，触发下游流处理任务启动；流处理任务在维护窗口期间自动暂停。
 
 ```yaml
-# 典型流程：数据采集 → 清洗 → 分词 → 特征提取 → 数据集划分
-pipeline:
-  name: nlp_data_preprocessing
-  tasks:
-    - name: load_raw_text
-      type: sql
-      source: iceberg://raw_corpus
+nodes:
+  # 1. 批处理任务
+  - id: "batch_loader"
+    taskConfig: { taskType: "spark_batch" }
+    controlPolicy:
+      retryWhen: "retryCount < 3"
 
-    - name: clean_and_filter
-      type: pyspark
-      dependencies: [load_raw_text]
-      startWhen: "event:load_raw_text.completed"
-      script: |
-        # 去除 HTML、去重、质量过滤
-
-    - name: tokenize
-      type: pyspark
-      dependencies: [clean_and_filter]
-      startWhen: "event:clean_and_filter.completed"
+  # 2. 流处理任务 (依赖批处理)
+  - id: "stream_processor"
+    taskConfig: { taskType: "flink_streaming" }
+    startWhen: "event.type == 'task.succeeded' && event.source.endsWith('batch_loader')"
+    controlPolicy:
+      stopWhen: "event.type == 'maintenance.start'"
+      restartWhen: "event.type == 'maintenance.end'"
 ```
 
-**特点**：
+### 场景 2：实时人机协作 (Human-in-the-loop)
 
-- 批处理模式（TB 级历史数据一次性处理）
-- 高并行度（充分利用集群资源）
-- 数据量大但不需要实时性
-
-#### 场景 2：视频数据处理（计算机视觉训练数据）
+流处理发现低置信度数据 -> 触发人工审批 -> 审批通过 -> 合并数据。
 
 ```yaml
-# 流程：视频解码 → 抽帧 → 质量过滤 → 目标检测 → 数据增强
-pipeline:
-  name: video_frame_extraction
-  tasks:
-    - name: decode_videos
-      type: ray  # 利用 Ray 的分布式 GPU 支持
-      source: ceph://raw_videos
-
-    - name: quality_filter
-      dependencies: [decode_videos]
-      startWhen: "event:decode_videos.completed"
-
-    - name: object_detection
-      dependencies: [quality_filter]
-      startWhen: "event:quality_filter.completed"
+nodes:
+  - id: "human_approval"
+    taskConfig: { taskType: "approval" }
+    startWhen: "event.type == 'data.quality.low'"
+    controlPolicy:
+      alertWhen: "duration > 24h"
 ```
 
-**特点**：
+## 4. 文档导航
 
-- IO + 计算双密集（视频解码极耗资源）
-- 需要 GPU 加速（模型推理）
-- PB 级存储管理
+### 快速入门
+*   [快速开始](docs/快速开始.md): 了解如何定义和运行第一个 Pipeline。
+*   [术语表](docs/术语表.md): 核心概念定义的权威参考。
 
-#### 场景 3：实时流处理 + 人工审批
+### 领域模型设计
+*   [Node (节点)](docs/领域模型设计/Node.md): 编排的基本单元，包含 TaskConfig 和 ControlPolicy。
+*   [Event (事件)](docs/领域模型设计/Event.md): 系统神经系统的信号载体。
+*   [Pipeline (流水线)](docs/领域模型设计/Pipeline.md): 节点的容器和命名空间。
+*   [TaskSchema (任务模式)](docs/领域模型设计/TaskSchema.md): 任务能力的元定义。
 
-```yaml
-# 内容审核流：MQ 消息 → 实时分类 → 质量检测 → 人工审批 → 训练集合并
-pipeline:
-  name: realtime_content_review
-  tasks:
-    - name: consume_stream
-      type: streaming
-      source: kafka://user_content
-      startWhen: "cron:* * * * *"  # 持续运行
+### 架构设计
+*   [架构总览](docs/架构设计/architecture-overview.md): 系统的分层架构和核心组件。
+*   [事件设计规范](docs/设计规范/event-design-specification.md): CloudEvents 规范在系统中的应用。
 
-    - name: auto_review
-      dependencies: [consume_stream]
-      startWhen: "event:consume_stream.data_available"
+### 开发规范
+*   [代码开发规范](docs/代码开发规范/coding-standards.md)
+*   [Git 工作流](docs/代码开发规范/git-workflow.md)
 
-    - name: human_approval
-      type: approval  # 人工审批任务
-      dependencies: [auto_review]
-      startWhen: "event:auto_review.completed && {{ quality_score < 0.8 }}"
-      timeout: 24h
+## 5. 为什么叫 ControlFlow?
 
-    - name: merge_to_dataset
-      dependencies: [human_approval]
-      startWhen: "event:human_approval.approved"
+在现代数据平台中，"数据流"通常由专门的计算引擎（如 Spark, Flink）或传输工具（如 Kafka）处理。编排引擎的真正价值在于**控制**——即在正确的时间、以正确的配置、对正确的资源执行操作。
 
-
-**特点**：
-
-- 实时响应（秒级延迟）
-- 人机结合（自动化 + 人工决策）
-- 增量更新训练集
-```
-
-## 如何解决
-
-### 核心设计理念
-
-#### 1. 事件驱动执行
-
-**传统轮询模式**（低效）：
-
-```python
-while True:
-    if upstream_task.status == "completed":
-        start_current_task()
-    time.sleep(10)  # 浪费资源
-```
-
-**事件驱动模式**（高效）：
-
-```yaml
-startWhen: "event:upstream_task.completed && {{ data_quality > 0.9 }}"
-```
-
-- 任务通过事件自动触发，无需轮询
-- 支持复杂条件：事件表达式 + 状态表达式
-- 订阅-取消订阅模式：任务启动后自动取消订阅，避免重复触发
-
-#### 2. 声明式配置
-
-用户只需声明"做什么"，系统自动决定"怎么做"：
-
-```yaml
-pipeline:
-  name: data_pipeline
-  tasks:
-    - name: task1
-      type: pyspark  # 声明：用 Spark 执行
-      source: iceberg://table  # 声明：从 Iceberg 读取
-      startWhen: "event:upstream.completed"  # 声明：何时启动
-      retryWhen: "{{ attempts < 3 }}"  # 声明：何时重试
-```
-
-系统自动处理：
-
-- 数据源连接管理
-- 执行引擎调度
-- 依赖关系解析
-- 重试和容错
-
-## 开发原则
-
-### 文档驱动开发
-
-1. 编写/更新领域模型文档
-   ↓
-2. 基于文档编写测试用例（TDD Red）
-   ↓
-3. 实现代码使测试通过（TDD Green）
-   ↓
-4. 重构代码（TDD Refactor）
-   ↓
-5. 验证代码符合文档定义
-
-**文档 = 核心资产，代码 = 实现资产**
-
-## 路线图
-
-### Phase 1: MVP 核心（当前）
-
-- [X] 领域模型设计（Pipeline, Task, Node, Expression, Event）
-- [X] 事件驱动执行模型设计
-- [X] DDD 分层架构设计
-- [ ] 基础 YAML DSL 解析
-- [ ] 1-2 个数据源支持（HDFS + Iceberg）
-- [ ] 1 个执行引擎（PySpark）
-- [ ] 简单批处理支持
-
-### Phase 2: 功能扩展
-
-- [ ] 更多数据源（Kafka, Ceph）
-- [ ] 第二执行引擎（Ray）
-- [ ] 流处理支持
-- [ ] 任务调度和重试
-- [ ] 基础监控
-
-### Phase 3: 生产强化
-
-- [ ] 数据血缘追踪
-- [ ] 性能优化
-- [ ] 完整监控和告警
-- [ ] 用户文档和示例
-
-## 参考资源
-
-### 竞品分析
-
-- **Apache Airflow**：工作流编排标杆，但偏调度而非数据抽象
-- **Databricks**：统一批流处理，但成本高且云绑定
-- **Prefect/Dagster**：现代化编排，但仍需编写大量代码
-- **Ray Data**：分布式数据处理，但缺乏编排能力
-- **Dify**：AI工作流应用编排，专注于应用层，但只支持批，且支持的节点类型不覆盖数据处理
-
-### 技术标准
-
-- **数据湖格式**：Apache Iceberg, Delta Lake
-- **数据血缘**：OpenLineage 标准
-- **编排模式**：DAG（有向无环图）
-- **架构模式**：Kappa 架构（统一流处理）
-
-## 贡献指南
-
-欢迎贡献！请遵循以下流程：
-
-1. 阅读 `docs/开发规范/` 了解编码规范
-2. 阅读 `docs/测试规范/` 了解测试要求
-3. 创建 Feature Branch
-4. 编写测试（TDD）
-5. 实现功能
-6. 提交 Pull Request
-
-## 许可证
-
-待定
-
-## 联系方式
-
-待定
-
-```
-
-```
-
-
-
-
-
-endPoint = "http://openapi.wedata.woa.com/dataplatform"
-projectId = "taiji_model_test1"
-folderId = "97160727111246624"
-
-filename = "preTrainStatistic_preTrainStatistic_3_1765198129_cfg"
-fileSuffix = ".yaml"
-proxyAuth = false
-
-
-
-
-
-endPoint = "http://openapi.wedata.woa.com/dataplatform"
-projectId = "2856512666501976064"
-folderId = "97160727111246624"
-
-filename = "preTrainIntegrationPipelineWithoutDeduplication_preTrainIntegration_V3_4_1765198194_cfg"
-fileSuffix = ".yaml"
-proxyAuth = false
+ControlFlow 强调这一职责：**我们不搬运数据，我们指挥数据的加工过程。**

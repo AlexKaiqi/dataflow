@@ -24,7 +24,7 @@ TaskSchema:
       description: "执行 SQL 查询"
       params:
         variables: Map<String, String>  # SQL 模板变量
-    
+
     cancel:
       description: "取消查询"
       params: {}
@@ -33,10 +33,10 @@ TaskSchema:
   events:
     - name: "started"
       payload: { queryId: string, engine: string }
-    
+
     - name: "succeeded"
       payload: { rowCount: long, outputTable: string }
-    
+
     - name: "failed"
       payload: { error: string, sqlState: string }
 
@@ -60,9 +60,9 @@ TaskDefinition:
   # 执行配置
   executionConfig:
     engine: "hive" | "spark_sql" | "presto" | "trino" | "iceberg"
-    
+
     database: string?                # 默认数据库
-    
+
     query: string                    # SQL 查询语句（支持模板变量 {var}）
 
     # 输出配置（可选）

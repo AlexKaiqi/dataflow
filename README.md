@@ -77,7 +77,36 @@ nodes:
 *   [代码开发规范](docs/代码开发规范/coding-standards.md)
 *   [Git 工作流](docs/代码开发规范/git-workflow.md)
 
-## 5. 为什么叫 ControlFlow?
+## 5. 代码质量保障
+
+本项目集成了多维度的代码质量检查工具，确保代码的健壮性、一致性和安全性。
+
+### 核心工具链
+
+| 工具 | 用途 | 配置标准 |
+| :--- | :--- | :--- |
+| **Spotless** | 代码格式化 | Google Java Format (AOSP 风格) |
+| **Checkstyle** | 代码风格检查 | Google Checks |
+| **PMD** | 静态代码分析 | Quickstart Ruleset |
+| **SpotBugs** | 潜在 Bug 分析 | FindSecBugs 安全插件 |
+| **Dependency Check** | 依赖漏洞扫描 | OWASP Top 10 |
+
+### 常用命令
+
+```bash
+# 1. 自动格式化代码 (提交前必跑)
+./gradlew formatCode
+
+# 2. 运行代码质量检查 (Checkstyle, PMD, Spotless Check)
+./gradlew codeQuality
+
+# 3. 完整验证 (包含单元测试、代码质量、安全扫描)
+./gradlew fullVerify
+```
+
+> **提示**: 推荐在 IDE 中安装 Checkstyle 和 SonarLint 插件以获得实时反馈。
+
+## 6. 为什么叫 ControlFlow?
 
 在现代数据平台中，"数据流"通常由专门的计算引擎（如 Spark, Flink）或传输工具（如 Kafka）处理。编排引擎的真正价值在于**控制**——即在正确的时间、以正确的配置、对正确的资源执行操作。
 

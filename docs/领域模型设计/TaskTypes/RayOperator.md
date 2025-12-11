@@ -25,11 +25,11 @@ TaskSchema:
       params:
         entrypoint: string
         runtimeEnv: Map<String, Any>
-    
+
     stop:
       description: "停止 Ray Job"
       params: {}
-      
+
     get_logs:
       description: "获取任务日志"
       params:
@@ -39,10 +39,10 @@ TaskSchema:
   events:
     - name: "job_submitted"
       payload: { rayJobId: string, submissionId: string }
-    
+
     - name: "status_changed"
       payload: { oldStatus: string, newStatus: string }
-    
+
     - name: "job_finished"
       payload: { exitCode: int, result: Any }
 
@@ -72,7 +72,7 @@ TaskDefinition:
   jobConfig:
     entrypoint: string               # 启动命令 (e.g., "python train.py")
     workingDir: string?              # 工作目录
-    
+
     # 运行时环境 (pip packages, env vars, etc.)
     runtimeEnv:
       pip: List<String>?

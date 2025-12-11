@@ -147,8 +147,8 @@ subprojects {
 
     spotbugs {
         toolVersion = '4.8.6'
-        effort = 'max'
-        reportLevel = 'low'
+        effort = Effort.MAX
+        reportLevel = Confidence.valueOf('LOW')
         ignoreFailures = true  // 初期设置为警告，不中断构建
     }
 
@@ -220,3 +220,6 @@ subprojects {
         dependsOn codeQuality
     }
 }
+
+import com.github.spotbugs.snom.Confidence
+import com.github.spotbugs.snom.Effort

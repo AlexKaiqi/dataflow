@@ -29,7 +29,7 @@ graph TD
     Kafka -->|Consume Events| Engine
     Engine -->|Evaluate| Policy
     Engine -->|Persist| State
-    
+
     Kafka -->|Trigger| Spark
     Kafka -->|Trigger| Flink
     Spark -->|Status Events| Kafka

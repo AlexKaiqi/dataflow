@@ -22,23 +22,23 @@
 
 ```bash
 # 1. 格式化代码（提交前必做）
-gradle spotlessApply
+./gradlew formatCode
 
 # 2. 运行代码质量检查
-gradle codeQuality
+./gradlew codeQuality
 
 # 3. 完整验证（测试 + 质量检查 + 安全扫描）
-gradle fullVerify
+./gradlew fullVerify
 
 # 4. 构建项目（自动包含代码质量检查）
-gradle build
+./gradlew build
 ```
 
 ### 提交代码前检查清单
 
-- [ ] 运行 `gradle spotlessApply` 格式化代码
-- [ ] 运行 `gradle test` 确保测试通过
-- [ ] 运行 `gradle codeQuality` 检查代码质量
+- [ ] 运行 `./gradlew formatCode` 格式化代码
+- [ ] 运行 `./gradlew test` 确保测试通过
+- [ ] 运行 `./gradlew codeQuality` 检查代码质量
 - [ ] 查看并修复报告中的问题
 
 ## 工具清单

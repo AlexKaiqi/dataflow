@@ -31,7 +31,7 @@ Pipeline:
   id: string                           # Pipeline ID，全局唯一
   name: string                         # Pipeline 名称
   description: string?                 # Pipeline 描述
-  
+
   # 元数据
   metadata:
     owners: string[]                   # 所有者列表

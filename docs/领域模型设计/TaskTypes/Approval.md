@@ -25,19 +25,19 @@ TaskSchema:
       params:
         approvers: List<String>
         context: Map<String, Any>
-    
+
     approve:
       description: "批准"
       params:
         approver: string
         comment: string?
-    
+
     reject:
       description: "拒绝"
       params:
         approver: string
         comment: string?
-        
+
     remind:
       description: "发送催办通知"
       params: {}
@@ -46,13 +46,13 @@ TaskSchema:
   events:
     - name: "approval_requested"
       payload: { ticketId: string, approvers: List<String> }
-    
+
     - name: "approved"
       payload: { approver: string, comment: string, timestamp: long }
-    
+
     - name: "rejected"
       payload: { approver: string, comment: string, timestamp: long }
-      
+
     - name: "timeout"
       payload: { duration: long }
 
@@ -77,7 +77,7 @@ TaskDefinition:
     approvers: List<String>          # 审批人列表 (用户ID或角色)
     minApprovals: int                # 最少通过人数 (默认 1)
     timeoutSeconds: long             # 超时时间 (秒)
-    
+
     # 通知模板
     notification:
       title: string

@@ -21,7 +21,7 @@ TaskSchema:
   type: string                         # Schema 类型标识（全局唯一）
                                        # 如: "flink_streaming", "shell_script"
   description: string                  # 描述
-  
+
   # ==== 2. 能力定义 ====
   actions: Map<String, ActionDefinition> # 支持的行为
   events: List<EventDefinition>          # 产生的事件
@@ -144,14 +144,14 @@ TaskSchema:
       description: string                   # 行为描述
       triggeredBy: string                   # 触发该行为的事件类型
                                             # 例如: "node.start_requested", "node.stop_requested"
-  
+
       payload: PayloadDefinition            # 输入事件的 payload 结构定义
         PayloadDefinition:
           # 标准字段（所有任务类型通用）
           nodeId: string                    # 节点 ID
           correlationId: string             # 关联 ID（pipelineId:nodeId）
           config: object                    # 任务配置（结构由 executionConfigSchema 约束）
-  
+
           # 可选字段（按任务能力）
           inputs?: object                   # 业务输入数据（自由结构，由用户脚本定义）
           params?: object                   # 参数（用于不需要inputs的简单任务，如 trigger）
@@ -163,21 +163,21 @@ TaskSchema:
       eventType: string                     # 事件类型（带 node. 前缀）
                                             # 标准事件: node.started, node.succeeded, node.failed
                                             # 自定义事件: node.approved, node.rejected, node.metrics_updated
-  
+
       description: string                   # 事件描述
       producedBy: string                    # 哪个行为产生此事件（action 名称）
-  
+
       payload: PayloadDefinition            # 事件的 payload 结构定义
         PayloadDefinition:
           # 标准字段（所有事件通用）
           nodeId: string                    # 节点 ID
           correlationId: string             # 关联 ID
           timestamp: integer                # 事件时间戳（毫秒）
-  
+
           # 执行器相关字段（可选）
           executorJobId?: string            # 执行器任务 ID
           duration?: integer                # 执行时长（毫秒）
-  
+
           # 可选字段（按任务能力）
           outputs?: object                  # 业务输出数据（自由结构，由用户脚本填充）
           error?: object                    # 错误信息（失败事件）
@@ -228,7 +228,7 @@ TaskSchema:
   type: "trigger"
   description: "流水线触发器，接收外部参数并启动流水线"
   category: "control"
-  
+
   actions:
     - action: "start"
       description: "启动触发器"
@@ -238,7 +238,7 @@ TaskSchema:
         correlationId: string
         config: {}                          # 触发器无需配置
         params: object                      # 外部传入的参数（自由结构）
-  
+
   events:
     - eventType: "node.started"
       description: "触发器启动完成"
@@ -248,7 +248,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         params: object                      # 透传 params 到 payload
-  
+
   executionConfigSchema:
     type: "object"
     properties: {}                          # 触发器无需配置
@@ -306,7 +306,7 @@ TaskSchema:
   type: "pyspark"
   description: "PySpark 批处理任务"
   category: "computation"
-  
+
   actions:
     - action: "start"
       description: "启动 PySpark 任务"
@@ -321,7 +321,7 @@ TaskSchema:
           executorMemory: string?           # 例如 "4g"
         inputs:                             # 业务输入（自由结构）
           # 例如: { source_path: "s3://...", table_name: "users" }
-  
+
   events:
     - eventType: "node.started"
       description: "任务已开始执行"
@@ -331,7 +331,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         executorJobId: string               # Spark Job ID
-  
+
     - eventType: "node.succeeded"
       description: "任务执行成功"
       producedBy: "start"
@@ -343,7 +343,7 @@ TaskSchema:
         duration: integer                   # 执行时长（毫秒）
         outputs:                            # 业务输出（自由结构）
           # 例如: { output_path: "s3://...", record_count: 1000 }
-  
+
     - eventType: "node.failed"
       description: "任务执行失败"
       producedBy: "start"
@@ -356,7 +356,7 @@ TaskSchema:
         error:
           message: string
           stackTrace: string
-  
+
   executionConfigSchema:
     type: "object"
     required: ["mainFile"]
@@ -387,12 +387,12 @@ nodes:
         mainFile: "s3://bucket/scripts/extract.py"
         driverMemory: "2g"
         executorMemory: "4g"
-  
+
     startPayload:
       inputs:
         source_table: "{{ event:trigger.started.payload.params.source_table }}"
         output_path: "s3://bucket/extracted/{{ event:trigger.started.payload.params.target_date }}"
-  
+
     startWhen: "event:trigger.started"
 ```
 
@@ -409,7 +409,7 @@ TaskSchema:
   type: "sql"
   description: "SQL 查询任务"
   category: "computation"
-  
+
   actions:
     - action: "start"
       description: "执行 SQL"
@@ -423,7 +423,7 @@ TaskSchema:
           connectionId: string              # 连接 ID
         inputs:                             # SQL 参数（自由结构）
           # 例如: { table_name: "users", date: "2025-01-15" }
-  
+
   events:
     - eventType: "node.started"
       description: "SQL 开始执行"
@@ -433,7 +433,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         executorJobId: string               # 查询 ID
-  
+
     - eventType: "node.succeeded"
       description: "SQL 执行成功"
       producedBy: "start"
@@ -446,7 +446,7 @@ TaskSchema:
         outputs:
           rowsAffected: integer
           resultPath: string?               # 结果存储路径（SELECT 查询）
-  
+
     - eventType: "node.failed"
       description: "SQL 执行失败"
       producedBy: "start"
@@ -457,7 +457,7 @@ TaskSchema:
         error:
           sqlState: string
           message: string
-  
+
   executionConfigSchema:
     type: "object"
     required: ["sql", "database", "connectionId"]
@@ -488,7 +488,7 @@ TaskSchema:
   type: "approval"
   description: "人工审批任务"
   category: "approval"
-  
+
   actions:
     - action: "start"
       description: "发起审批请求"
@@ -502,7 +502,7 @@ TaskSchema:
           notificationUrl: string?          # 通知回调 URL
         inputs:                             # 审批上下文（自由结构）
           # 例如: { reason: "数据质量检查", score: 0.85 }
-  
+
   events:
     - eventType: "node.started"
       description: "审批请求已发出"
@@ -512,7 +512,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         approvalId: string                  # 审批 ID
-  
+
     - eventType: "node.approved"
       description: "审批通过"
       producedBy: "start"
@@ -524,7 +524,7 @@ TaskSchema:
         outputs:
           approver: string                  # 审批人
           comment: string                   # 审批意见
-  
+
     - eventType: "node.rejected"
       description: "审批拒绝"
       producedBy: "start"
@@ -536,7 +536,7 @@ TaskSchema:
         outputs:
           approver: string
           reason: string                    # 拒绝原因
-  
+
     - eventType: "node.timeout"
       description: "审批超时"
       producedBy: "start"
@@ -545,7 +545,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         approvalId: string
-  
+
   executionConfigSchema:
     type: "object"
     required: ["approvers", "timeoutMinutes"]
@@ -618,7 +618,7 @@ TaskSchema:
   type: "streaming"
   description: "流处理任务"
   category: "computation"
-  
+
   actions:
     - action: "start"
       description: "启动流处理任务"
@@ -631,21 +631,21 @@ TaskSchema:
           sink: object                      # 数据汇配置
           checkpointPath: string            # 检查点路径
         inputs:                             # 处理配置（自由结构）
-  
+
     - action: "stop"
       description: "停止流处理任务"
       triggeredBy: "node.stop_requested"
       payload:
         nodeId: string
         correlationId: string
-  
+
     - action: "restart"
       description: "重启流处理任务"
       triggeredBy: "node.restart_requested"
       payload:
         nodeId: string
         correlationId: string
-  
+
   events:
     - eventType: "node.started"
       description: "流处理任务已启动"
@@ -655,7 +655,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         executorJobId: string
-  
+
     - eventType: "node.stopped"
       description: "流处理任务已停止"
       producedBy: "stop"
@@ -664,7 +664,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         executorJobId: string
-  
+
     - eventType: "node.restarted"
       description: "流处理任务已重启"
       producedBy: "restart"
@@ -673,7 +673,7 @@ TaskSchema:
         correlationId: string
         timestamp: integer
         executorJobId: string
-  
+
     - eventType: "node.failed"
       description: "流处理任务失败"
       producedBy: "start"
@@ -685,7 +685,7 @@ TaskSchema:
         error:
           message: string
           stackTrace: string
-  
+
     - eventType: "node.metrics_updated"
       description: "流处理指标更新"
       producedBy: "start"
@@ -697,7 +697,7 @@ TaskSchema:
           processedRecords: integer
           throughput: number                # 每秒处理记录数
           lag: integer                      # 延迟（毫秒）
-  
+
   executionConfigSchema:
     type: "object"
     required: ["source", "sink", "checkpointPath"]
@@ -816,10 +816,10 @@ payload:
   # 标准字段（系统填充）
   nodeId: string                            # 由 ControlFlowEngine 填充
   correlationId: string                     # 由 ControlFlowEngine 填充
-  
+
   # 配置字段（由 Node.taskConfig.config 提供）
   config: object                            # 结构由 executionConfigSchema 约束
-  
+
   # 数据字段（由 Node.startPayload 提供）
   inputs?: object                           # 业务输入（自由结构）
   params?: object                           # 参数（用于简单任务，如 trigger）
@@ -835,11 +835,11 @@ payload:
   nodeId: string                            # 由执行器填充
   correlationId: string                     # 由执行器填充
   timestamp: integer                        # 由执行器填充
-  
+
   # 执行器字段（由执行器填充）
   executorJobId?: string                    # 执行器任务 ID
   duration?: integer                        # 执行时长（毫秒）
-  
+
   # 数据字段（由用户脚本或执行器填充）
   outputs?: object                          # 业务输出（自由结构）
   error?: object                            # 错误信息（失败事件）
@@ -951,11 +951,11 @@ def is_long_running(task_schema: TaskSchema) -> bool:
 class ExecutorRegistry:
     def __init__(self):
         self._executors: Dict[str, Type[Executor]] = {}
-  
+
     def register(self, task_type: str, executor_class: Type[Executor]):
         """注册执行器"""
         self._executors[task_type] = executor_class
-  
+
     def get_executor(self, task_type: str) -> Type[Executor]:
         """获取执行器"""
         return self._executors.get(task_type)
@@ -977,23 +977,23 @@ from abc import ABC, abstractmethod
 class Executor(ABC):
     def __init__(self, task_schema: TaskSchema):
         self.task_schema = task_schema
-  
+
     @abstractmethod
     async def execute(self, action: str, payload: dict):
         """
         执行任务行为
-    
+
         Args:
             action: 行为名称（如 start, stop）
             payload: 输入 payload
         """
         pass
-  
+
     @abstractmethod
     async def publish_event(self, event_type: str, payload: dict):
         """
         发布事件
-    
+
         Args:
             event_type: 事件类型（如 node.started）
             payload: 事件 payload
@@ -1010,13 +1010,13 @@ class PySparkExecutor(Executor):
             await self._start(payload)
         else:
             raise ValueError(f"Unsupported action: {action}")
-  
+
     async def _start(self, payload: dict):
         node_id = payload['nodeId']
         correlation_id = payload['correlationId']
         config = payload['config']
         inputs = payload.get('inputs', {})
-    
+
         # 1. 发布 node.started
         spark_job_id = await self._submit_spark_job(config, inputs)
         await self.publish_event('node.started', {
@@ -1025,10 +1025,10 @@ class PySparkExecutor(Executor):
             'timestamp': int(time.time() * 1000),
             'executorJobId': spark_job_id
         })
-    
+
         # 2. 等待任务完成
         result = await self._wait_for_completion(spark_job_id)
-    
+
         # 3. 发布 node.succeeded 或 node.failed
         if result.success:
             await self.publish_event('node.succeeded', {
@@ -1153,11 +1153,11 @@ class CustomMLTrainingExecutor(Executor):
     async def execute(self, action: str, payload: dict):
         if action == 'start':
             await self._start_training(payload)
-  
+
     async def _start_training(self, payload: dict):
         # 实现训练逻辑
         ...
-    
+
         # 定期发布进度事件
         await self.publish_event('node.training_progress', {
             'nodeId': node_id,
@@ -1169,7 +1169,7 @@ class CustomMLTrainingExecutor(Executor):
                 'accuracy': current_accuracy
             }
         })
-    
+
         # 训练完成后发布成功事件
         await self.publish_event('node.succeeded', {
             'nodeId': node_id,

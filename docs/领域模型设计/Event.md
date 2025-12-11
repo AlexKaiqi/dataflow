@@ -22,19 +22,19 @@ Event:
   type: string                              # 事件类型
                                             # 格式: {domain}.{entity}.{action}
                                             # 示例: "task.node.succeeded", "system.maintenance.start"
-  
+
   source: string                            # 事件源 (URI)
                                             # 示例: "/pipelines/p-123/nodes/node-A"
-  
+
   time: Instant                             # 事件发生时间
 
   # ==== 2. 上下文属性 (Context) ====
   pipelineId: string                        # 所属 Pipeline ID
-  
+
   executionId: string                       # 执行实例 ID (物理范围)
                                             # Batch: Run ID (每次运行不同)
                                             # Stream: Deployment ID (重启后可能改变)
-  
+
   correlationId: string                     # 逻辑关联 ID (逻辑范围)
                                             # 用于跨 Execution 串联业务。
                                             # 示例: 数据分区 ID, 业务事务 ID

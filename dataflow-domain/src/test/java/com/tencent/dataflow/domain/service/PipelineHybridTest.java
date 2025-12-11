@@ -36,17 +36,7 @@ class PipelineHybridTest {
         schemaRegistry.put(flinkSchema.getType(), flinkSchema);
 
         // Mock Repository
-        NodeRepository mockRepo = new NodeRepository() {
-            @Override
-            public Node findById(String nodeId) {
-                return nodeStore.get(nodeId);
-            }
-
-            @Override
-            public List<Node> findAllActiveNodes() {
-                return new ArrayList<>(nodeStore.values());
-            }
-        };
+        NodeRepository mockRepo = new com.tencent.dataflow.domain.repository.InMemoryNodeRepository(nodeStore);
 
         controlPlaneService = new ControlPlaneServiceImpl(mockRepo, mockExecutor, schemaRegistry);
     }

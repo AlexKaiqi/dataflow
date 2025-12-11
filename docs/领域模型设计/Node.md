@@ -32,7 +32,7 @@ Node:
   startWhen: string                         # 启动条件表达式 (SpEL)
                                             # 示例: "event.type == 'pipeline.started'"
                                             # 示例: "event.type == 'task.succeeded' && event.source == 'node_A'"
-  
+
   startPayload: Map<String, String>         # 启动参数映射
                                             # Key: 任务输入参数名
                                             # Value: SpEL 表达式 (从 event 中提取值)
@@ -42,19 +42,19 @@ Node:
   controlPolicy: ControlPolicy              # 定义"怎么控制"
     stopWhen: string                        # 停止条件 (SpEL)
                                             # 示例: "event.type == 'maintenance.window.start'"
-    
+
     restartWhen: string                     # 重启条件 (SpEL)
                                             # 示例: "event.type == 'config.updated'"
-    
+
     retryWhen: string                       # 重试条件 (SpEL, 用于 Batch)
                                             # 示例: "error.code == 'NETWORK_TIMEOUT' && retryCount < 3"
-    
+
     skipWhen: string                        # 跳过条件 (SpEL)
                                             # 示例: "context.isHoliday == true"
-    
+
     alertWhen: string                       # 告警条件 (SpEL)
                                             # 示例: "metrics.lag > 10000"
-    
+
     customRules: List<PolicyRule>           # 自定义规则 (Event -> Action)
       - condition: string                   # SpEL 表达式
         action: string                      # 触发的 Action 名称 (需在 TaskSchema 中定义)

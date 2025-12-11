@@ -24,18 +24,18 @@ TaskSchema:
       description: "提交并启动 Flink 作业"
       params:
         savepointPath: string?     # 从指定 Savepoint 启动
-    
+
     stop:
       description: "停止作业并触发 Savepoint"
       params:
         drain: boolean             # 是否等待数据处理完
         savepointDir: string?      # Savepoint 保存路径
-    
+
     restart:
       description: "重启作业 (Stop + Start)"
       params:
         fromLatestSavepoint: boolean
-    
+
     scale:
       description: "调整并行度 (Rescale)"
       params:
@@ -45,13 +45,13 @@ TaskSchema:
   events:
     - name: "started"
       payload: { jobId: string, webUrl: string }
-    
+
     - name: "stopped"
       payload: { savepointPath: string }
-    
+
     - name: "failed"
       payload: { error: string, restartable: boolean }
-    
+
     - name: "metrics"
       payload: { lag: long, throughput: double }
       description: "定期上报监控指标"
@@ -72,21 +72,21 @@ TaskSchema:
 ```yaml
 TaskDefinition:
   type: "flink_streaming"
-  
+
   # 执行配置
   executionConfig:
     # 代码位置
     jarUrl: string                 # Flink Jar 包地址
     entryClass: string             # 主类名
-    
+
     # Flink 参数
     flinkVersion: string           # e.g., "1.17"
     parallelism: integer           # 默认并行度
-    
+
     # Checkpoint 配置
     checkpointInterval: integer    # 毫秒
     stateBackend: "rocksdb" | "filesystem"
-    
+
     # 运行时参数 (传递给 main 方法)
     programArgs:
       - "--topic"
@@ -110,17 +110,17 @@ Node:
   id: "realtime_etl"
   taskConfig:
     taskDefinitionRef: "com.ops:flink_etl:1.0"
-  
+
   controlPolicy:
     # 自动扩容: 当消费积压超过 10000 时，扩容到 4 并行度
     customRules:
       - condition: "event.type == 'metrics' && event.payload.lag > 10000"
         action: "scale"
         params: { parallelism: "4" }
-    
+
     # 维护窗口自动停止
     stopWhen: "event.type == 'maintenance.window.start'"
-    
+
     # 维护结束自动恢复 (从最近 Savepoint)
     restartWhen: "event.type == 'maintenance.window.end'"
 ```

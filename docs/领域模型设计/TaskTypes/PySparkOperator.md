@@ -24,7 +24,7 @@ TaskSchema:
       description: "提交 Spark 作业"
       params:
         args: Map<String, String>  # 运行时参数覆盖
-    
+
     cancel:
       description: "取消正在运行的作业"
       params: {}
@@ -33,10 +33,10 @@ TaskSchema:
   events:
     - name: "started"
       payload: { applicationId: string, trackingUrl: string }
-    
+
     - name: "succeeded"
       payload: { outputPaths: List<String>, metrics: Map<String, Number> }
-    
+
     - name: "failed"
       payload: { error: string, logUrl: string }
 

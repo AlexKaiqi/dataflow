@@ -59,17 +59,23 @@ controlflow-root/
 ## 4. 关键架构设计
 
 ### 4.1 领域层 (Domain)
+
 核心业务逻辑，不依赖任何技术实现。
+
 - **TaskSchema**: 定义任务的"元数据"（支持哪些 Action，产生哪些 Event）。
 - **Reactive State Machine**: 负责管理任务的生命周期状态流转。
 
 ### 4.2 基础设施层 (Infrastructure)
+
 实现了与外部系统的交互。为了支持多种计算引擎，采用了**插件化设计**：
+
 - `EngineAdapter`: 统一接口，屏蔽 Flink/Spark/Ray 的差异。
 - `EventChannel`: 统一事件通道，接收来自 Agent 或 外部系统的回调。
 
 ### 4.3 应用层 (App)
+
 负责用例编排。
+
 - **Command Handlers**: 处理 `StartTask`, `StopTask`, `ScaleTask` 等指令。
 - **Event Handlers**: 处理 `TaskStarted`, `TaskFailed`, `ApprovalCompleted` 等事件。
 
@@ -77,7 +83,7 @@ controlflow-root/
 
 1.  **依赖原则**: Domain 层不依赖 Infrastructure 层，通过 Gateway 接口倒置依赖。
 2.  **包命名**: 新增代码请使用 `com.tencent.controlflow` 包名。
-3.  **扩展性**: 新增 Task Type 时，优先在 Infrastructure 层增加对应的 Adapter 实现，而非修改核心逻辑。
+3. **扩展性**: 新增 Task Type 时，优先在 Infrastructure 层增加对应的 Adapter 实现，而非修改核心逻辑。
 
 ## 6. 快速开始
 

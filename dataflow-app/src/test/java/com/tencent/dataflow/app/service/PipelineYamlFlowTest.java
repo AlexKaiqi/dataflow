@@ -17,12 +17,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -103,17 +101,17 @@ class PipelineYamlFlowTest {
                     type: approval_task
                     config:
                       baseUrl: http://approval-service
-                    startWhen: "sql_node.succeeded"
+                    startWhen: "#event.source == '/pipelines/complex-pipeline/nodes/sql-node' && #event.type == 'succeeded'"
                   - id: ray-node
                     type: ray_task
                     config:
                       baseUrl: http://ray-service
-                    startWhen: "approval_node.succeeded"
+                    startWhen: "#event.source == '/pipelines/complex-pipeline/nodes/approval-node' && #event.type == 'succeeded'"
                   - id: another-node
                     type: another_task
                     config:
                       baseUrl: http://another-service
-                    startWhen: "approval_node.failed"
+                    startWhen: "#event.source == '/pipelines/complex-pipeline/nodes/approval-node' && #event.type != 'succeeded'"
                 """;
 
         // 1. Submit Pipeline
